@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os
-import re
 import sys
 import json
 import argparse
@@ -12,8 +11,6 @@ from subprocess import call, Popen
 
 class StoreNodeTypeId(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        print "NODE TYPE: {}".format(self.dest)
-        print "NODE ID VALUES: {}".format(values)
         setattr(namespace, 'node_type', self.dest)
         setattr(namespace, 'node_id', values)
 
@@ -120,6 +117,7 @@ if node_type != 'all':
     print "Connecting to {} as {}/{}".format(ip_addr, user_name, password)
     call([ssh_script, '-l', user_name, '-p', password, ip_addr])
 else:  # Open sessions for all setup nodes
+    # Build ssh commands
     tabs = []
     for t in ('emanage', 'vheads', 'loaders'):
         for i in xrange(len(testenv['data'][t])):
@@ -127,24 +125,33 @@ else:  # Open sessions for all setup nodes
             print "Connecting to {} {} ({} {}/{})".format(
                 t, i, ip_addr, user_name, password)
 
-            if os_name == 'Linux':
-                tabs.append([ssh_script, '-l', user_name, '-p', password,
-                             ip_addr])
-                # Might be needed to open a bunch of separate shells on Mac OSX
-                # Popen(['xterm', '-e', ssh_script, '-l', user_name, '-p',
-                #        password, ip_addr])
-            elif os_name == 'Darwin':
-                # TODO: Launch Terminal.app / itern2
-                print "ERROR - Mac OS X is not yet supported"
-                # Useful links
-                # https://stackoverflow.com/questions/7171725/open-new-terminal-tab-from-command-line-mac-os-x
-                
-            else:
-                print "ERROR - Unsupported OS: {}".format(os_name)
+            tabs.append([ssh_script, '-l', user_name, '-p', password,
+                         ip_addr])
 
+    # Open OS-specific terminal emulators
     if os_name == 'Linux':
         cmd = ["gnome-terminal"]
         for tab in tabs:
             cmd.extend(['--tab', '-e', " ".join(tab)])
         print "Executing cmd: {}".format(cmd)
         call(cmd)
+    elif os_name == 'Darwin':
+        for i, tab in enumerate(tabs):
+            osascr = []
+            osascr.append('tell application \"Terminal\"\n')
+            osascr.append('tell application \"System Events\" to keystroke \"t\" using command down\n')
+            osascr.append('do script \"' + " ".join(tab) + '\" in front window\n')
+            osascr.append('end tell\n')
+            osa_file = '/tmp/tab-{}'.format(i)
+            with open(osa_file, 'w') as f:
+                f.writelines(osascr)
+            cmd = ['osascript', osa_file]
+            print "Running cmd: {}".format(" ".join(cmd))
+            call(cmd)
+            # TODO: Clean up the tmp files? Could be useful to re-open the tabs manually
+    else:
+        print "ERROR - Unsupported OS: {}".format(os_name)
+        sys.exit(30)
+
+# TODO: Connect to the vip by default
+# TODO: Reuse the -v to connect to vheads explicitly
