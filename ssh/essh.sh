@@ -22,6 +22,10 @@ function usage {
     Examples:
         # Connect to emanage 0 on setup 208
         $MYNAME 208 -e0
+        # Open a session to each node in setup 208
+        $MYNAME 208 -Aa
+        # Add your public key (only needed once/setup) to all nodes and open a session to each node in setup 208
+        $MYNAME 208 -Aa
         # Clear cached json and connect to loader 5 on setup 208
         $MYNAME -C 30 -l5
 END_OF_USAGE
