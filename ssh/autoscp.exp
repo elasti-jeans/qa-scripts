@@ -1,0 +1,29 @@
+#!/usr/bin/expect
+
+set SOURCE [lindex $argv 0]
+set TARGET [lindex $argv 1]
+set PASSWD [lindex $argv 2]
+
+set ERRORCODE 0 
+
+puts "\nCOMMAND: scp -r $SOURCE $TARGET\n"
+spawn scp -r $SOURCE $TARGET
+
+for {} 1 {} {
+    expect {
+        "Are you sure you want to continue connecting" {send "yes\n"}
+        "password:" {send "$PASSWD\n";break}
+        "REMOTE HOST IDENTIFICATION HAS CHANGED" {puts "\nautoscp: ~user/.ssh/known_hosts seems to have a bad entry\n";set ERRORCODE 1;break}
+        "Secure connection to " {puts "\nautoscp: Remote host denies connection\n";set ERRORCODE 1;break}
+        "Name or service not known" {puts "\nautoscp: Remote host does not exist\n";set ERRORCODE 1;break}
+        "No such file or directory" {puts "\nautoscp: File not found\n";set ERRORCODE 1;break}
+    }
+}
+
+# TBD - Add handling for the following conditions
+
+# Permission denied, please try again
+
+interact
+exit $ERRORCODE
+

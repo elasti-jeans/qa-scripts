@@ -1,0 +1,22 @@
+sshhost=$1
+sshuser=$2
+sshpass=$3
+
+mydir=$(dirname $0)
+
+which expect > /dev/null 2>&1
+if [ $? != 0 ]; then
+	echo Expect not found, try 'yum -y install expect'
+	exit 1
+fi
+
+sshcommand="$mydir/autossh.exp $sshhost $sshuser $sshpass"
+$sshcommand
+if [ $? -eq 11 ]; then
+	tmpfile=/tmp/sshfile
+	$(ssh $sshuser@$sshhost 2>&1 | grep "Offending RSA key in" | awk '{print $5}' | awk -F: '{print "export sshfile="$1"\nexport badline="$2}')
+	awk "{if (NR!=$badline) print \$0;}" $sshfile > $tmpfile
+	mv $tmpfile $sshfile
+	$sshcommand
+fi
+

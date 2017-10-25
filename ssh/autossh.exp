@@ -1,0 +1,27 @@
+#!/usr/bin/expect
+
+# Params: 1 - sRHOST (name of the remote machine)
+#         2 - sUSER (user connecting to the REMOTE)
+#         3 - sPASS (password of the USER on the REMOTE)
+#         4 - sCMD (command to be executed on the REMOTE)
+#
+# Start sCMD on sRHOST machine as sUSER with sPASS
+set sRHOST [lindex $argv 0]
+set sUSER  [lindex $argv 1]
+set sPASS  [lindex $argv 2]
+set sCMD   [lindex $argv 3]
+
+spawn ssh $sRHOST -l $sUSER "$sCMD"
+
+for {} 1 {} { 
+    expect {
+        "password:" {send "$sPASS\n";set sERRORCODE 0;break}
+        "Are you sure you want to continue connecting" {send "yes\n"}
+        "REMOTE HOST IDENTIFICATION HAS CHANGED" {puts "\nautossh: ~user/.ssh/known_hosts seems to have a bad entry\n";exit 11}
+        "Secure connection to $sRHOST refused" {puts "\nautossh: Remote host denies connection\n";exit 12}
+        "Name or service not known" {puts "\nautossh: Remote host does not exist\n";exit 13}
+    }
+}
+
+interact
+
