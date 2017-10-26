@@ -52,7 +52,9 @@ machine_type.add_argument('-l', '--loader', dest='loaders', type=int,
                           action=StoreNodeTypeId, help="Loader id")
 machine_type.add_argument('-e', '--emanage', dest='emanage', type=int,
                           nargs='?', action=StoreNodeTypeId, help="eManage id")
-machine_type.add_argument('-v', '--vip', dest='node_type', action='store_const',
+machine_type.add_argument('-v', '--vhead', dest='vheads', type=int,
+                          action=StoreNodeTypeId, help="vHead id")
+machine_type.add_argument('-f', '--floating_ip', dest='node_type', action='store_const',
                           const='emanage_vip', help="eManage VIP")
 machine_type.add_argument('-a', '--all', dest='node_type', action='store_const',
                           const='all', help="Connect to all nodes")
@@ -73,7 +75,7 @@ ssh_script = os.path.join(os.path.dirname(sys.argv[0]), 'ssh.py')
 json_file = args.conf_file
 node_type = args.node_type
 key_file = args.public_key
-if args.node_type in ('loaders', 'emanage'):
+if args.node_type in ('emanage', 'vheads', 'loaders'):
     node_id = args.node_id
 user_name = args.user_name
 password = args.password
@@ -90,7 +92,7 @@ if not os.path.isfile(ssh_script):
     print "ERROR - {} not found".format(ssh_script)
     raise
 
-if node_type in ('loaders', 'emanage'):
+if node_type in ('emanage', 'vheads', 'loaders'):
     try:
         ip_addr = testenv['data'][node_type][node_id]['ip_address']
     except IndexError:
