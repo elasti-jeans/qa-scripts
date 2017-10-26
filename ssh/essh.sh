@@ -80,9 +80,8 @@ if [ $CLEAR_CACHE -eq 1 ]; then
 fi
 
 if [ ! -f $CONF ]; then
-    #exec_cmd wget -P $MYDIR http://elab.il.elastifile.com/api/v1/system/cluster/$CID
-    exec_cmd curl http://elab.il.elastifile.com/api/v1/system/cluster/$CID -o $MYDIR/$CID
+    exec_cmd curl http://elab.il.elastifile.com/api/v1/system/cluster/$CID -o $CONF
 fi
 
-$MYDIR/ssh2env.py $@ $MYDIR/$CID
+$MYDIR/ssh2env.py $@ $CONF
 

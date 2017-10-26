@@ -2,17 +2,28 @@
 
 import os
 import sys
+import ssh
 import json
+import random
+import string
 import argparse
 
 from platform import system
 from subprocess import call, Popen
+
+copy_id_hack = True  # Remove once emanage runs openssh >= 7.3p1
+copy_id_bin = '/usr/bin/ssh-copy-id'
+mydir = os.path.dirname(sys.argv[0])
 
 
 class StoreNodeTypeId(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, 'node_type', self.dest)
         setattr(namespace, 'node_id', values)
+
+
+def random_str(len=8, chars=string.ascii_letters+string.digits):
+    return "".join(random.choice(chars) for _ in xrange(len))
 
 
 def get_public_key(public_key_file):
@@ -25,11 +36,12 @@ def get_public_key(public_key_file):
 def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
                    emanage_pass='123456', vhead_user='root'):
     print "Adding public key to vhead {}".format(vhead_ip)
-    authorized_keys_file = '~/.ssh/authorized_keys'
     public_key = get_public_key(key_file)
+    # authorized_keys_file = '~/.ssh/authorized_keys'
 
-    cmd = "ssh {0}@{1} \"echo -e \'\\\n{2}\' \\\\>\\\\> {3}\"".\
-          format(vhead_user, vhead_ip, public_key, authorized_keys_file)
+    # # TODO: emanage should have the vhead in known_hosts
+    # cmd = "ssh {0}@{1} \"echo -e \'\\\n{2}\' \\\\>\\\\> {3}\"".\
+    #       format(vhead_user, vhead_ip, public_key, authorized_keys_file)
 
     # Shell - works
     # ssh.py -e "ssh root@10.11.147.87 grep 'AAA' /tmp/a || ssh root@10.11.147.87 \"echo 'BBB BBB' \\\>\\\> /tmp/pkey\"" -l root -p 123456 10.11.209.208
@@ -39,8 +51,24 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
     #       "ssh {0}@{1} \"echo \'{2}\' \\\\>\\\\> {3}\"".\
     #       format(vhead_user, vhead_ip, public_key, authorized_keys_file)
 
-    call([ssh_script, '-l', emanage_user, '-p', emanage_pass, '-e', cmd,
-          emanage_vip])
+    # call([ssh_script, '-l', emanage_user, '-p', emanage_pass, '-e', cmd,
+    #       emanage_vip])
+    # sess.ssh(command=cmd, handle_known_hosts=True)
+    session_id = random_str(6)
+    tmp_key_file = '/tmp/{}.key.pub'.format(session_id)
+    sess = ssh.SshSession(emanage_user, emanage_vip, password=emanage_pass)
+    sess.scp(os.path.expanduser(key_file), tmp_key_file)
+
+    if copy_id_hack:
+        # openssh requires the private key to be present to be able to copy id
+        # https://bugzilla.mindrot.org/show_bug.cgi?id=2110
+        copy_id_bin = os.path.join('/tmp', 'copy-id')
+        local_copy_id_bin = os.path.join(mydir, 'copy-id')
+        sess.scp(os.path.expanduser(local_copy_id_bin), copy_id_bin)
+    sess.ssh("{} -f -o 'StrictHostKeyChecking no' -i {} {}@{}".
+             format(copy_id_bin, tmp_key_file, vhead_user, vhead_ip))
+    # Cleanup
+    # sess.ssh("rm -f {}".format(tmp_key_file))
 
 
 # Define command line arguments
@@ -71,7 +99,7 @@ parser.add_argument('-A', '--add_key', dest='add_key', action='store_true',
 parser.add_argument(dest='conf_file', help="JSON configuration file")
 args = parser.parse_args()
 
-ssh_script = os.path.join(os.path.dirname(sys.argv[0]), 'ssh.py')
+ssh_script = os.path.join(mydir, 'ssh.py')
 json_file = args.conf_file
 node_type = args.node_type
 key_file = args.public_key
@@ -154,6 +182,3 @@ else:  # Open sessions for all setup nodes
     else:
         print "ERROR - Unsupported OS: {}".format(os_name)
         sys.exit(30)
-
-# TODO: Connect to the vip by default
-# TODO: Reuse the -v to connect to vheads explicitly

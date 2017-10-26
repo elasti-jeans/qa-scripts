@@ -25,13 +25,18 @@ PEXPECT LICENSE
 """
 
 from pexpect import *
-import os, sys
-import getpass
-import time
-import getopt
 import re
+import os
+import sys
+import time
+import fcntl
+import string
+import getopt
 import shutil
-import struct, fcntl, termios, signal
+import struct
+import signal
+import getpass
+import termios
 
 myname = os.path.basename(__file__)
 host = None
@@ -41,9 +46,9 @@ rcmd = None
 verbose = False
 
 
-class ssh_session():
+class SshSession():
 
-    "Session with extra state including the password to be used."
+    """Session with extra state including the password to be used."""
 
     def __init__(self, user, host, password=None, verbose=False):
         self.user = user
@@ -64,7 +69,7 @@ class ssh_session():
             EOF,
             ]
 
-        self.f = open('ssh.out','w')
+        self.f = open('ssh.out', 'w')
 
     def __repr__(self):
         outl = 'class :'+self.__class__.__name__
@@ -95,9 +100,12 @@ class ssh_session():
             sys.stderr.write("-> " + command + "\n")
 
         seen = self.child.expect_exact(self.keys)
-        self.f.write(str(self.child.before) + str(self.child.after)+'\n')
+        try:
+            self.f.write(str(self.child.before) + str(self.child.after)+'\n')
+        except Exception:
+            pass
 
-        if seen == 2: # Bad known_hosts entry
+        if seen == 2:  # Bad known_hosts entry
             lines = self.child.readlines()
             for line in lines:
                 self.f.write(line)
@@ -109,7 +117,7 @@ class ssh_session():
 
         if seen == 3:  # Bad key in known_hosts (conflict)
             lines = self.child.before
-            if type(lines) is not list: # Force list
+            if type(lines) is not list:  # Force list
                 lines = lines,
 
             ip_addr = None
@@ -165,7 +173,7 @@ class ssh_session():
 
     def ssh(self, command=None, handle_known_hosts=False):
         interactive = True
-        sshcmd = "ssh -l %s %s" % (self.user,self.host)
+        sshcmd = "ssh -l %s %s" % (self.user, self.host)
         if command is not None:
             interactive = False
             sshcmd = "%s \"%s\"" % (sshcmd, command)
@@ -181,18 +189,23 @@ class ssh_session():
         return self.child.after
 
     def scp(self, src, dst, handle_known_hosts=False):
-        return self.__exec("scp %s %s@%s:%s" % (src, session.user, session.host,
-                                                dst), handle_known_hosts)
+        return self.__exec("scp {} {}@{}:{}".format(src, self.user, self.host,
+                                                    dst), handle_known_hosts)
+
+    def copy_id(self, identity_file, handle_known_hosts=False):
+        return self.__exec("ssh-copy-id -i {} {}@{}" % (
+            identity_file, self.user, self.host), handle_known_hosts)
 
     def exists(self, file):
-        "Retrieve file permissions of specified remote file."
+        """Retrieve file permissions of specified remote file."""
         seen = self.ssh("/bin/ls -ld %s" % file)
         if string.find(seen, "No such file") > -1:
             return None  # File doesn't exist
         else:
             return seen.split()[0]  # Return permission field of listing.
 
-    def remove_known_hosts_entry(self, host, known_hosts_file='~/.ssh/known_hosts', tmpfile=None):
+    def remove_known_hosts_entry(
+            self, host, known_hosts_file='~/.ssh/known_hosts', tmpfile=None):
         known_hosts_file = os.path.expanduser(known_hosts_file)
         print "Removing bad host entry (%s) from %s" % (host, known_hosts_file)
         if tmpfile is None:
@@ -212,7 +225,7 @@ class ssh_session():
 
 
 def testssh(user, host, password):
-    s = ssh_session(user, host, password=password)
+    s = SshSession(user, host, password=password)
     s.ssh(handle_known_hosts=True)
 
 
@@ -273,5 +286,5 @@ def parse_params():
 
 if __name__ == "__main__":
     parse_params()
-    s = ssh_session(user, host, password=password, verbose=verbose)
+    s = SshSession(user, host, password=password, verbose=verbose)
     s.ssh(command=rcmd, handle_known_hosts=True)

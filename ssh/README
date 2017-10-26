@@ -3,7 +3,11 @@ Connect to a setup node (or all nodes) by cluster id on eLab
 
 == Requirements ==
 
+- Install pexpect
 sudo easy_install pexpect
+
+- Make sure you have a key ready to be used, e.g. ~/.ssh/id_rsa.pub
+# If you don't, run ssh-keygen to create one
 
 == Usage ==
 
