@@ -28,7 +28,7 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
     authorized_keys_file = '~/.ssh/authorized_keys'
     public_key = get_public_key(key_file)
 
-    cmd = "ssh {0}@{1} \"echo \'{2}\' \\\\>\\\\> {3}\"".\
+    cmd = "ssh {0}@{1} \"echo -e \'\\\n{2}\' \\\\>\\\\> {3}\"".\
           format(vhead_user, vhead_ip, public_key, authorized_keys_file)
 
     # Shell - works
