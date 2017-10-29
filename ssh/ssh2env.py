@@ -10,6 +10,7 @@ import string
 import logging
 import argparse
 
+from time import sleep
 from platform import system
 from subprocess import call
 
@@ -59,7 +60,17 @@ def download_testenv(cid, force=False):
     if force or not os.path.isfile(dest):
         logger.info("Downloading json for setup {} from eLab (force: {})".
                     format(cid, force))
-        urllib.urlretrieve(elab_cluster_url+cid, cid)
+        try:
+            urllib.urlretrieve(elab_cluster_url+cid, cid)
+        except IOError as ex:
+            sleep(2)
+            logger.warning("Failed to download json from eLab. {}: {} "
+                           "-- retrying".format(ex.errno, ex.strerror))
+            try:
+                urllib.urlretrieve(elab_cluster_url+cid, cid)
+            except IOError as ex:
+                raise Exception("Final attempt to download json from eLab "
+                                "failed. {}: {}".format(ex.errno, ex.strerror))
     return dest
 
 
@@ -265,8 +276,12 @@ else:  # Open sessions for all setup nodes
             logger.info("Connecting to {} ({} {}/{})".format(
                 testenv['data'][t][i]['host'], ip_addr, user_name,
                 password))
-            cmds.append([os.path.abspath(ssh_script), '-l', user_name,
-                         '-p', password, ip_addr])
+            if ip_addr is None:
+                logger.error("Skipping {}, since eLab reports its IP as null".
+                             format(testenv['data'][t][i]['host']))
+            else:
+                cmds.append([os.path.abspath(ssh_script), '-l', user_name,
+                             '-p', password, ip_addr])
 
     # Open OS-specific terminal emulators
     if os_name == 'Linux':
