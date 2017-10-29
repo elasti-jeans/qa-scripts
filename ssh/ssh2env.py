@@ -24,12 +24,37 @@ class StoreNodeTypeId(argparse.Action):
         setattr(namespace, 'node_id', values)
 
 
+def read_testenv(json_file):
+    """
+    Read tesenv json
+    """
+    with open(json_file) as f:
+        testenv = json.load(f)
+
+    if testenv is None:
+        raise Exception("ERROR - failed to load data from {}".format(json_file))
+
+    return testenv
+
+
 def random_str(len=8, chars=string.ascii_letters+string.digits):
+    """
+    Return random string
+    """
     return "".join(random.choice(chars) for _ in xrange(len))
 
 
 def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
                    emanage_pass='123456', vhead_user='root'):
+    """
+    Add public key to a vHead
+    :param key_file: Public key
+    :param emanage_vip: eManage virtual IP address
+    :param vhead_ip: vHead's IP address
+    :param emanage_user: eManage username
+    :param emanage_pass: eManage user's password
+    :param vhead_user: vHead's user
+    """
     print "Adding public key to vhead {}".format(vhead_ip)
 
     sess = ssh.SshSession(emanage_user, emanage_vip, password=emanage_pass)
@@ -55,6 +80,57 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
              format(copy_id_bin, remote_public_key, vhead_user, vhead_ip))
 
 
+def connect_gnome_term(cmds):
+    """Connect to gnoe-terminal on Linux"""
+    cmd = ["gnome-terminal"]
+    for tab_cmd in cmds:
+        cmd.extend(['--tab', '-e', " ".join(tab_cmd)])
+    print "Executing cmd: {}".format(cmd)
+    call(cmd)
+
+
+def connect_iterm(cmds):
+    """Connect to iTerm on OS X"""
+    osa_iterm = """
+tell application "iTerm"
+  create window with default profile
+  tell application "iTerm"
+    tell current window
+      set cmds to {{{}}}
+      repeat with a from 1 to length of cmds
+        set cmd to item a of cmds
+        create tab with default profile command cmd
+      end repeat
+    end tell
+  end tell
+end tell
+"""
+    osa_file = '/tmp/iterm.osa'
+    acmds = ['"{}"'.format(" ".join(s)) for s in cmds]  # Format commands for Apple Script
+    with open(osa_file, 'w') as f:
+        f.write(osa_iterm.format(", ".join(acmds)))
+    cmd = ['osascript', osa_file]
+    print "Running cmd: {}".format(" ".join(cmd))
+    call(cmd)
+
+
+def connect_terminal(cmds):
+    """Connect to Terminal app on OS X"""
+    osa_terminal = """
+tell application \"Terminal\"
+    tell application \"System Events\" to keystroke \"t\" using command down
+    do script \"{}\" in front window
+end tell
+"""
+    for i, tab in enumerate(cmds):
+        osa_file = '/tmp/tab-{}'.format(i)
+        with open(osa_file, 'w') as f:
+            f.writelines(osa_terminal.format(" ".join(tab)))
+        cmd = ['osascript', osa_file]
+        print "Running cmd {}: {}".format(i, " ".join(cmd))
+        call(cmd)
+
+
 # Define command line arguments
 parser = argparse.ArgumentParser(description='Connect to a test setup node '
                                              'specified by type [and id]')
@@ -78,6 +154,8 @@ parser.add_argument('-k', '--public_key', dest='public_key',
                     default='~/.ssh/id_rsa.pub', help="Public key file")
 parser.add_argument('-A', '--add_key', dest='add_key', action='store_true',
                     default=False, help="Add keys to vHeads")
+parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
+                    default="Terminal", help="Mac Os X Terminal emulator")
 
 
 parser.add_argument(dest='conf_file', help="JSON configuration file")
@@ -91,13 +169,9 @@ if args.node_type in ('emanage', 'vheads', 'loaders'):
 user_name = args.user_name
 password = args.password
 add_key = args.add_key
+mac_term = args.mac_term
 
-# Read json
-with open(json_file) as f:
-    testenv = json.load(f)
-
-if testenv is None:
-    raise Exception("ERROR - failed to load data from {}".format(json_file))
+testenv = read_testenv(json_file)
 
 if not os.path.isfile(ssh_script):
     print "ERROR - {} not found".format(ssh_script)
@@ -119,7 +193,7 @@ else:
 
 os_name = system()
 
-# Add public key to vheads
+# Add public key to vHeads
 if add_key:
     emanage_vip_addr = testenv['data']['emanage_vip']
     for i in xrange(len(testenv['data']['vheads'])):
@@ -131,37 +205,26 @@ if node_type != 'all':
     call([ssh_script, '-l', user_name, '-p', password, ip_addr])
 else:  # Open sessions for all setup nodes
     # Build ssh commands
-    tabs = []
+    cmds = []
     for t in ('emanage', 'vheads', 'loaders'):
         for i in xrange(len(testenv['data'][t])):
             ip_addr = testenv['data'][t][i]['ip_address']
             print "Connecting to {} {} ({} {}/{})".format(
                 t, i, ip_addr, user_name, password)
 
-            tabs.append([ssh_script, '-l', user_name, '-p', password,
-                         ip_addr])
+            cmds.append([os.path.abspath(ssh_script), '-l', user_name,
+                         '-p', password, ip_addr])
 
     # Open OS-specific terminal emulators
     if os_name == 'Linux':
-        cmd = ["gnome-terminal"]
-        for tab in tabs:
-            cmd.extend(['--tab', '-e', " ".join(tab)])
-        print "Executing cmd: {}".format(cmd)
-        call(cmd)
+        connect_gnome_term(cmds)
     elif os_name == 'Darwin':
-        for i, tab in enumerate(tabs):
-            osascr = []
-            osascr.append('tell application \"Terminal\"\n')
-            osascr.append('tell application \"System Events\" to keystroke \"t\" using command down\n')
-            osascr.append('do script \"' + " ".join(tab) + '\" in front window\n')
-            osascr.append('end tell\n')
-            osa_file = '/tmp/tab-{}'.format(i)
-            with open(osa_file, 'w') as f:
-                f.writelines(osascr)
-            cmd = ['osascript', osa_file]
-            print "Running cmd: {}".format(" ".join(cmd))
-            call(cmd)
-            # TODO: Clean up the tmp files? Could be useful to re-open the tabs manually
+        # TODO: Check if iTerm2 is installed, and use that one by default
+        if mac_term == "iTerm":
+            connect_iterm(cmds)
+        elif mac_term == "Terminal":
+            connect_terminal(cmds)
+        else:
+            raise Exception("Usupported Mac terminal: {}".format(mac_term))
     else:
-        print "ERROR - Unsupported OS: {}".format(os_name)
-        sys.exit(30)
+        raise Exception("ERROR - Unsupported OS: {}".format(os_name))
