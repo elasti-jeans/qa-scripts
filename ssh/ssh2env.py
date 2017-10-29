@@ -4,24 +4,63 @@ import os
 import sys
 import ssh
 import json
+import urllib
 import random
 import string
+import logging
 import argparse
 
 from platform import system
 from subprocess import call
 
 mydir = os.path.dirname(sys.argv[0])
+elab_url = 'http://elab.il.elastifile.com'
+elab_cluster_url = '{}/api/v1/system/cluster/'.format(elab_url)
 copy_id_bin = '/usr/bin/ssh-copy-id'
 ssh_script = os.path.join(mydir, 'ssh.py')
 remote_public_key = None
 copy_id_hack = True  # Remove once emanage runs openssh >= 7.3p1
 
 
+def init_log(log_file='result.log', debug_level=logging.INFO):
+    log_formatter = logging.Formatter(
+        '%(asctime)s [%(filename)s/%(funcName)s] %(levelname)s: %(message)s',
+        datefmt='%Y/%m/%d %H:%M:%S')
+
+    logger = logging.getLogger()
+    logger.setLevel(debug_level)  # Global debug level
+
+    log_ch = logging.StreamHandler(sys.stdout)
+    log_ch.setLevel(logging.INFO)  # Console debug level
+    log_ch.setFormatter(log_formatter)
+
+    log_fh = logging.FileHandler(log_file, mode='w')  # Overwrite the log file
+    log_fh.setLevel(logging.DEBUG)  # File debug level
+    log_fh.setFormatter(log_formatter)
+
+    logger.addHandler(log_ch)
+    logger.addHandler(log_fh)
+
+    logger.info('Log initialized - logging to %s', log_file)
+
+    return logger
+
+
 class StoreNodeTypeId(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, 'node_type', self.dest)
+        values = 0 if values is None else values
         setattr(namespace, 'node_id', values)
+
+
+def download_testenv(cid, force=False):
+    """Download json from eLab by setup id"""
+    dest = os.path.join(mydir, cid)
+    if force or not os.path.isfile(dest):
+        logger.info("Downloading json for setup {} from eLab (force: {})".
+                    format(cid, force))
+        urllib.urlretrieve(elab_cluster_url+cid, cid)
+    return dest
 
 
 def read_testenv(json_file):
@@ -55,7 +94,7 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
     :param emanage_pass: eManage user's password
     :param vhead_user: vHead's user
     """
-    print "Adding public key to vhead {}".format(vhead_ip)
+    logger.info("Adding public key to vhead {}".format(vhead_ip))
 
     sess = ssh.SshSession(emanage_user, emanage_vip, password=emanage_pass)
 
@@ -85,7 +124,7 @@ def connect_gnome_term(cmds):
     cmd = ["gnome-terminal"]
     for tab_cmd in cmds:
         cmd.extend(['--tab', '-e', " ".join(tab_cmd)])
-    print "Executing cmd: {}".format(cmd)
+    logger.info("Executing cmd: {}".format(cmd))
     call(cmd)
 
 
@@ -106,11 +145,12 @@ tell application "iTerm"
 end tell
 """
     osa_file = '/tmp/iterm.osa'
-    acmds = ['"{}"'.format(" ".join(s)) for s in cmds]  # Format commands for Apple Script
+    # Format commands for Apple Script
+    acmds = ['"{}"'.format(" ".join(s)) for s in cmds]
     with open(osa_file, 'w') as f:
         f.write(osa_iterm.format(", ".join(acmds)))
     cmd = ['osascript', osa_file]
-    print "Running cmd: {}".format(" ".join(cmd))
+    logger.info("Running cmd: {}".format(" ".join(cmd)))
     call(cmd)
 
 
@@ -127,41 +167,51 @@ end tell
         with open(osa_file, 'w') as f:
             f.writelines(osa_terminal.format(" ".join(tab)))
         cmd = ['osascript', osa_file]
-        print "Running cmd {}: {}".format(i, " ".join(cmd))
+        logger.info("Running cmd {}: {}".format(i, " ".join(cmd)))
         call(cmd)
 
+
+logger = init_log(os.path.join(mydir, 'ssh2env.log'))
 
 # Define command line arguments
 parser = argparse.ArgumentParser(description='Connect to a test setup node '
                                              'specified by type [and id]')
 # Only one argument in the group is accepted, and that arg is required
-machine_type = parser.add_mutually_exclusive_group(required=True)
+machine_type = parser.add_mutually_exclusive_group()
 machine_type.add_argument('-l', '--loader', dest='loaders', type=int,
-                          action=StoreNodeTypeId, help="Loader id")
+                          default=0, nargs='?', action=StoreNodeTypeId,
+                          metavar='LOADER_ID', help="Loader id")
 machine_type.add_argument('-e', '--emanage', dest='emanage', type=int,
-                          nargs='?', action=StoreNodeTypeId, help="eManage id")
+                          default=0, nargs='?', action=StoreNodeTypeId,
+                          metavar='EMANAGE_ID', help="eManage id")
 machine_type.add_argument('-v', '--vhead', dest='vheads', type=int,
-                          action=StoreNodeTypeId, help="vHead id")
-machine_type.add_argument('-f', '--floating_ip', dest='node_type', action='store_const',
-                          const='emanage_vip', help="eManage VIP")
+                          default=0, nargs='?', action=StoreNodeTypeId,
+                          metavar='VHEAD_ID', help="vHead id")
+machine_type.add_argument('-f', '--floating_ip', dest='node_type',
+                          action='store_const', const='emanage_vip',
+                          help="eManage VIP")
 machine_type.add_argument('-a', '--all', dest='node_type', action='store_const',
                           const='all', help="Connect to all nodes")
 parser.add_argument('-u', '--user', dest='user_name', default='root',
                     help="User name")
 parser.add_argument('-p', '--password', dest='password', default='123456',
                     help="User password")
-parser.add_argument('-k', '--public_key', dest='public_key',
-                    default='~/.ssh/id_rsa.pub', help="Public key file")
-parser.add_argument('-A', '--add_key', dest='add_key', action='store_true',
-                    default=False, help="Add keys to vHeads")
+parser.add_argument('-i', '--identity_file', dest='public_key',
+                    default='~/.ssh/id_rsa.pub',
+                    help="Identity (public key) file")
+parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
+                    default=False, help="Add key to vHeads")
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
                     default="Terminal", help="Mac Os X Terminal emulator")
+parser.add_argument('-c', '--clear_cache', dest='clear_cache',
+                    action='store_true', default=False,
+                    help="Clear cached json for the specified setup id")
 
 
-parser.add_argument(dest='conf_file', help="JSON configuration file")
+parser.add_argument(dest='setup_id', help="JSON configuration file")
 args = parser.parse_args()
 
-json_file = args.conf_file
+setup_id = args.setup_id
 node_type = args.node_type
 key_file = args.public_key
 if args.node_type in ('emanage', 'vheads', 'loaders'):
@@ -170,26 +220,26 @@ user_name = args.user_name
 password = args.password
 add_key = args.add_key
 mac_term = args.mac_term
+clear_cache = args.clear_cache
 
+json_file = download_testenv(setup_id, force=clear_cache)
 testenv = read_testenv(json_file)
 
 if not os.path.isfile(ssh_script):
-    print "ERROR - {} not found".format(ssh_script)
-    raise
+    raise Exception("SSH script {} not found".format(ssh_script))
 
 if node_type in ('emanage', 'vheads', 'loaders'):
     try:
         ip_addr = testenv['data'][node_type][node_id]['ip_address']
     except IndexError:
-        print "ERROR - setup doesn't have enough {} (total {})".format(
-            node_type, len(testenv['data'][node_type]))
-        raise
+        raise Exception("Setup doesn't have enough {} (total {})".
+            format(node_type, len(testenv['data'][node_type])))
 elif node_type == 'emanage_vip':
     ip_addr = testenv['data'][node_type]
 elif node_type == 'all':
     pass
 else:
-    print "ERROR - unsupported node type {}".format(node_type)
+    raise Exception("Unsupported node type {}".format(node_type))
 
 os_name = system()
 
@@ -197,11 +247,14 @@ os_name = system()
 if add_key:
     emanage_vip_addr = testenv['data']['emanage_vip']
     for i in xrange(len(testenv['data']['vheads'])):
-        add_public_key(key_file, emanage_vip_addr,
-                       testenv['data']['vheads'][i]['ip_address'])
+        vhead_ip_addr = testenv['data']['vheads'][i]['ip_address']
+        logger.info("Adding your public key to {} ({})".format(
+            vhead_ip_addr, testenv['data']['vheads'][i]['host']))
+        add_public_key(key_file, emanage_vip_addr, vhead_ip_addr)
 
 if node_type != 'all':
-    print "Connecting to {} as {}/{}".format(ip_addr, user_name, password)
+    logger.info("Connecting to {} as {}/{}".format(ip_addr, user_name,
+                                                   password))
     call([ssh_script, '-l', user_name, '-p', password, ip_addr])
 else:  # Open sessions for all setup nodes
     # Build ssh commands
@@ -209,9 +262,9 @@ else:  # Open sessions for all setup nodes
     for t in ('emanage', 'vheads', 'loaders'):
         for i in xrange(len(testenv['data'][t])):
             ip_addr = testenv['data'][t][i]['ip_address']
-            print "Connecting to {} {} ({} {}/{})".format(
-                t, i, ip_addr, user_name, password)
-
+            logger.info("Connecting to {} ({} {}/{})".format(
+                testenv['data'][t][i]['host'], ip_addr, user_name,
+                password))
             cmds.append([os.path.abspath(ssh_script), '-l', user_name,
                          '-p', password, ip_addr])
 
@@ -225,6 +278,6 @@ else:  # Open sessions for all setup nodes
         elif mac_term == "Terminal":
             connect_terminal(cmds)
         else:
-            raise Exception("Usupported Mac terminal: {}".format(mac_term))
+            raise Exception("Unsupported Mac terminal: {}".format(mac_term))
     else:
-        raise Exception("ERROR - Unsupported OS: {}".format(os_name))
+        raise Exception("Unsupported OS: {}".format(os_name))

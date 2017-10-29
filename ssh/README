@@ -11,46 +11,47 @@ sudo easy_install pexpect
 
 == Usage ==
 
-    = External script =
-    Usage: essh.sh [-v] [-C] <CID> [ss2env.py args]
-    Where:
-        -C - Clear Cached json
-        -v - Verbose
     Examples:
-        # Connect to emanage 0 on setup 208
-        essh.sh 208 -e0
         # Open a session to each node in setup 208
-        essh.sh 208 -Aa
+        ssh2env.py 208 -a
         # Add your public key (only needed once/setup) to all nodes and open a session to each node in setup 208
-        essh.sh 208 -Aa
+        ssh2env.py 208 -ka
+        # Connect to emanage 0 on setup 208
+        ssh2env.py 208 -e0
+        # Skipping the id part will connect to the first node (id=0) of the requested type - same as above
+        ssh2env.py 208 -e
         # Clear cached json and connect to loader 5 on setup 208
-        essh.sh -C 30 -l5
+        ssh2env.py 208 -c -l5
 
 
+usage: ssh2env.py [-h] [-l [LOADER_ID] | -e [EMANAGE_ID] | -v [VHEAD_ID] | -f
+                  | -a] [-u USER_NAME] [-p PASSWORD] [-i PUBLIC_KEY] [-k]
+                  [-m MAC_TERM] [-c]
+                  setup_id
 
-    = Internal script =
-    usage: ssh2env.py [-h] (-l LOADERS | -e [EMANAGE] | -v | -a) [-u USER_NAME]
-                      [-p PASSWORD] [-k PUBLIC_KEY] [-A]
-                      conf_file
+Connect to a test setup node specified by type [and id]
 
-    Connect to a test setup node specified by type [and id]
+positional arguments:
+  setup_id              JSON configuration file
 
-    positional arguments:
-      conf_file             JSON configuration file
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      -l LOADERS, --loader LOADERS
-                            Loader id
-      -e [EMANAGE], --emanage [EMANAGE]
-                            eManage id
-      -v, --vip             eManage VIP
-      -a, --all             Connect to all nodes
-      -u USER_NAME, --user USER_NAME
-                            User name
-      -p PASSWORD, --password PASSWORD
-                            User password
-      -k PUBLIC_KEY, --public_key PUBLIC_KEY
-                            Public key file
-      -A, --add_key         Add keys to vHeads
+optional arguments:
+  -h, --help            show this help message and exit
+  -l [LOADER_ID], --loader [LOADER_ID]
+                        Loader id
+  -e [EMANAGE_ID], --emanage [EMANAGE_ID]
+                        eManage id
+  -v [VHEAD_ID], --vhead [VHEAD_ID]
+                        vHead id
+  -f, --floating_ip     eManage VIP
+  -a, --all             Connect to all nodes
+  -u USER_NAME, --user USER_NAME
+                        User name
+  -p PASSWORD, --password PASSWORD
+                        User password
+  -i PUBLIC_KEY, --identity_file PUBLIC_KEY
+                        Identity (public key) file
+  -k, --add_key         Add key to vHeads
+  -m MAC_TERM, --mac_term MAC_TERM
+                        Mac Os X Terminal emulator
+  -c, --clear_cache     Clear cached json for the specified setup id
 
