@@ -21,6 +21,7 @@ copy_id_bin = '/usr/bin/ssh-copy-id'
 ssh_script = os.path.join(mydir, 'ssh.py')
 remote_public_key = None
 copy_id_hack = True  # Remove once emanage runs openssh >= 7.3p1
+node_types = ['emanage', 'vheads', 'loaders']
 
 
 def init_log(log_file='result.log', debug_level=logging.INFO):
@@ -140,29 +141,110 @@ def connect_gnome_term(cmds):
     call(cmd)
 
 
-def connect_iterm(cmds):
+def connect_iterm(setup_id, cmds_by_type, split="true", messages=[]):
     """Connect to iTerm on OS X"""
     osa_iterm = """
+set split_by_node_type to {0}
 tell application "iTerm"
-  create window with default profile
-  tell application "iTerm"
-    tell current window
-      set cmds to {{{}}}
-      repeat with a from 1 to length of cmds
-        set cmd to item a of cmds
-        create tab with default profile command cmd
-      end repeat
+    create window with default profile
+    activate
+    set w to current window
+    if w is equal to missing value then
+        log "Creating new window"
+        set w to (create window with default profile)
+    else
+        log "Reusing existing window"
+    end if
+
+    #set emanage_hostnames to ...
+    #set emanage_cmds to ...
+    #set vheads_hostnames to ...
+    #set vheads_cmds to ...
+    #set loaders_hostnames to ...
+    #set loaders_cmds to ...
+    {1}
+
+    set node_hostnames to {{emanage_hostnames, vheads_hostnames, loaders_hostnames}}
+    set node_groups to {{emanage_cmds, vheads_cmds, loaders_cmds}}
+
+    tell w
+        repeat with gi from 1 to length of node_groups
+            set node_type_cmds to item gi of node_groups
+            set node_type_hostnames to item gi of node_hostnames
+            
+            if split_by_node_type then
+                # Create new tab for each node group, except the 1st one
+                if gi is not equal to 1 then
+                    log "Creating new tab"
+                    set t to (create tab with default profile)
+                    select t
+                end if
+            end if
+
+            repeat with ni from 1 to length of node_type_cmds
+                # Actual ssh.py command
+                set cmd to item ni of node_type_cmds
+                set hostname to item ni of node_type_hostnames
+
+                log "Executing " & cmd
+
+                if split_by_node_type then
+                    tell current session of w
+
+                        # Create new session for each node, except the 1st one in each group
+                        if ni is equal to 1 then
+                            log "... in existing session"
+                            write text cmd
+                        else
+                            log "... in new (split) session"
+                            set s to (split horizontally with same profile command cmd)
+                            select s
+                        end if
+                    end tell
+                else
+                    # Create new tab for each node, except the 1st one
+                    if gi is equal to 1 and ni is equal to 1 then
+                        log "Skipping new tab"
+                        tell current session of w
+                            write text cmd
+                        end tell
+                    else
+                        log "Creating new tab"
+                        set t to (create tab with default profile command cmd)
+                        select t
+                    end if
+                end if
+
+                tell current session
+                    delay 0.8
+                    set sess_name to "{2} " & hostname
+                    set name to sess_name
+                end tell
+            end repeat
+        end repeat
     end tell
-  end tell
 end tell
+
+say "Connected to test setup {2}"
+{3}
 """
-    osa_file = '/tmp/iterm.osa'
-    # Format commands for Apple Script
-    acmds = ['"{}"'.format(" ".join(s)) for s in cmds]
+    osa_file = '/tmp/iterm2.osa'
+    list_defs = ""
+    for t in node_types:
+        hostnames = list()
+        cmds = list()
+        for n in cmds_by_type[t]:
+            hostnames.append(n['hostname'])
+            cmds.append(" ".join(n['cmd']))
+        list_defs += 'set {}_hostnames to {{"{}"}}\n'.format(t, '", "'.join(hostnames))
+        list_defs += 'set {}_cmds to {{"{}"}}\n'.format(t, '", "'.join(cmds))
+
+    say = ""
+    if messages:
+        say = 'say "{}"'.format('".\n"'.join(messages))
     with open(osa_file, 'w') as f:
-        f.write(osa_iterm.format(", ".join(acmds)))
+        f.write(osa_iterm.format(split, list_defs, setup_id, say))
     cmd = ['osascript', osa_file]
-    logger.info("Running cmd: {}".format(" ".join(cmd)))
     call(cmd)
 
 
@@ -215,6 +297,8 @@ parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
                     default=False, help="Add key to vHeads")
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
                     default="Terminal", help="Mac Os X Terminal emulator")
+parser.add_argument('-s', '--iterm_split', dest='iterm_split', action='store_const',
+                    const='true', default='false', help="(iTerm only) split sessions by node type")
 parser.add_argument('-c', '--clear_cache', dest='clear_cache',
                     action='store_true', default=False,
                     help="Clear cached json for the specified setup id")
@@ -226,13 +310,14 @@ args = parser.parse_args()
 setup_id = args.setup_id
 node_type = args.node_type
 key_file = args.public_key
-if args.node_type in ('emanage', 'vheads', 'loaders'):
+if args.node_type in node_types:
     node_id = args.node_id
 user_name = args.user_name
 password = args.password
 add_key = args.add_key
 mac_term = args.mac_term
 clear_cache = args.clear_cache
+iterm_split = args.iterm_split
 
 json_file = download_testenv(setup_id, force=clear_cache)
 testenv = read_testenv(json_file)
@@ -240,7 +325,7 @@ testenv = read_testenv(json_file)
 if not os.path.isfile(ssh_script):
     raise Exception("SSH script {} not found".format(ssh_script))
 
-if node_type in ('emanage', 'vheads', 'loaders'):
+if node_type in node_types:
     try:
         ip_addr = testenv['data'][node_type][node_id]['ip_address']
     except IndexError:
@@ -271,18 +356,24 @@ if node_type != 'all':
 else:  # Open sessions for all setup nodes
     # Build ssh commands
     cmds = []
-    for t in ('emanage', 'vheads', 'loaders'):
+    problems = []
+    node_groups = {}
+    for t in node_types:
+        node_groups[t] = []
         for i in xrange(len(testenv['data'][t])):
             ip_addr = testenv['data'][t][i]['ip_address']
+            node_hostname = testenv['data'][t][i]['hostname']
             logger.info("Connecting to {} ({} {}/{})".format(
-                testenv['data'][t][i]['hostname'], ip_addr, user_name,
-                password))
+                node_hostname, ip_addr, user_name, password))
             if ip_addr is None:
                 logger.error("Skipping {}, since eLab reports its IP as null".
                              format(testenv['data'][t][i]['hostname']))
+                problems.append("Skipped {} {} due to missing IP address".format(t, i))
             else:
-                cmds.append([os.path.abspath(ssh_script), '-l', user_name,
-                             '-p', password, ip_addr])
+                cmd = [os.path.abspath(ssh_script), '-l', user_name, '-p',
+                       password, ip_addr]
+                node_groups[t].append({'hostname': node_hostname, 'cmd': cmd})
+                cmds.append(cmd)
 
     # Open OS-specific terminal emulators
     if os_name == 'Linux':
@@ -290,7 +381,7 @@ else:  # Open sessions for all setup nodes
     elif os_name == 'Darwin':
         # TODO: Check if iTerm2 is installed, and use that one by default
         if mac_term == "iTerm":
-            connect_iterm(cmds)
+            connect_iterm(setup_id, node_groups, split=iterm_split, messages=problems)
         elif mac_term == "Terminal":
             connect_terminal(cmds)
         else:
