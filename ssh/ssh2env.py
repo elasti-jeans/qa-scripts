@@ -126,6 +126,7 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
                 "File not found: ({})".format(local_copy_id_bin)
             sess.scp(os.path.expanduser(local_copy_id_bin), copy_id_bin)
 
+    sess.ssh("echo '' >> ~/.ssh/authorized_keys")
     sess.ssh("{} -f -o 'StrictHostKeyChecking no' -i {} {}@{}".
              format(copy_id_bin, remote_public_key, vhead_user, vhead_ip))
 
@@ -260,7 +261,7 @@ if add_key:
     for i in xrange(len(testenv['data']['vheads'])):
         vhead_ip_addr = testenv['data']['vheads'][i]['ip_address']
         logger.info("Adding your public key to {} ({})".format(
-            vhead_ip_addr, testenv['data']['vheads'][i]['host']))
+            vhead_ip_addr, testenv['data']['vheads'][i]['hostname']))
         add_public_key(key_file, emanage_vip_addr, vhead_ip_addr)
 
 if node_type != 'all':
@@ -274,11 +275,11 @@ else:  # Open sessions for all setup nodes
         for i in xrange(len(testenv['data'][t])):
             ip_addr = testenv['data'][t][i]['ip_address']
             logger.info("Connecting to {} ({} {}/{})".format(
-                testenv['data'][t][i]['host'], ip_addr, user_name,
+                testenv['data'][t][i]['hostname'], ip_addr, user_name,
                 password))
             if ip_addr is None:
                 logger.error("Skipping {}, since eLab reports its IP as null".
-                             format(testenv['data'][t][i]['host']))
+                             format(testenv['data'][t][i]['hostname']))
             else:
                 cmds.append([os.path.abspath(ssh_script), '-l', user_name,
                              '-p', password, ip_addr])
