@@ -265,6 +265,14 @@ end tell
         call(cmd)
 
 
+def osx_is_installed(app_name):
+    cmd = ["osascript", "-e", 'exists application \"{}\"'.format(app_name)]
+    logger.debug("Executing {}".format(cmd))
+    success = call(cmd) == 0
+    logger.info("App '{}' installed: {}".format(app_name, success))
+    return success
+
+
 logger = init_log(os.path.join(mydir, 'ssh2env.log'))
 
 # Define command line arguments
@@ -296,7 +304,7 @@ parser.add_argument('-i', '--identity_file', dest='public_key',
 parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
                     default=False, help="Add key to vHeads")
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
-                    default="Terminal", help="Mac Os X Terminal emulator")
+                    default="", help="Override OS X Terminal emulator detection")
 parser.add_argument('-s', '--iterm_split', dest='iterm_split', action='store_const',
                     const='true', default='false', help="(iTerm only) split sessions by node type")
 parser.add_argument('-c', '--clear_cache', dest='clear_cache',
@@ -379,8 +387,10 @@ else:  # Open sessions for all setup nodes
     if os_name == 'Linux':
         connect_gnome_term(cmds)
     elif os_name == 'Darwin':
-        # TODO: Check if iTerm2 is installed, and use that one by default
-        if mac_term == "iTerm":
+        if not mac_term:
+            mac_term = "iTerm2" if osx_is_installed("iTerm2") else "Terminal"
+
+        if mac_term == "iTerm2":
             connect_iterm(setup_id, node_groups, split=iterm_split, messages=problems)
         elif mac_term == "Terminal":
             connect_terminal(cmds)
