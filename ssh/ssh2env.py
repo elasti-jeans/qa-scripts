@@ -132,6 +132,17 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
              format(copy_id_bin, remote_public_key, vhead_user, vhead_ip))
 
 
+def update_prompt(host, user, password, node_type=None):
+    """Customize node's prompt"""
+    remote_path = '/etc/profile.d'
+    fname = 'vheads-prompt.sh' if node_type == 'vheads' else 'qa-prompt.sh'
+    assert os.path.isfile(os.path.expanduser(fname)),\
+        "Prompt file not found: ({})".format(fname)
+    logger.info("Updating prompt on {}".format(host))
+    sess = ssh.SshSession(user, host, password)
+    sess.scp(os.path.expanduser(fname), os.path.join(remote_path, fname))
+
+
 def connect_gnome_term(cmds):
     """Connect to gnoe-terminal on Linux"""
     cmd = ["gnome-terminal"]
@@ -299,17 +310,22 @@ parser.add_argument('-u', '--user', dest='user_name', default='root',
                     help="User name")
 parser.add_argument('-p', '--password', dest='password', default='123456',
                     help="User password")
+parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
+                    default=False, help="Add your public key to all vHeads")
 parser.add_argument('-i', '--identity_file', dest='public_key',
                     default='~/.ssh/id_rsa.pub',
                     help="Identity (public key) file")
-parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
-                    default=False, help="Add key to vHeads")
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
-                    default="", help="Override OS X Terminal emulator detection (iTerm/Terminal)")
-parser.add_argument('-s', '--iterm_split', dest='iterm_split', action='store_const',
-                    const='true', default='false', help="(iTerm only) split sessions by node type")
+                    default="", help="Override OS X Terminal emulator "
+                                     "detection (iTerm/Terminal)")
+parser.add_argument('-s', '--iterm_split', dest='iterm_split',
+                    action='store_const', const='true', default='false',
+                    help="(iTerm only) split sessions by node type")
 parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
                     default='false', help="Do not issue sound alerts")
+parser.add_argument('-P', '--customize_prompt', dest='customize_prompt',
+                    action='store_true', default=False,
+                    help="Customize prompt on remote hosts")
 parser.add_argument('-c', '--clear_cache', dest='clear_cache',
                     action='store_true', default=False,
                     help="Clear cached json for the specified setup id")
@@ -330,6 +346,7 @@ mac_term = args.mac_term
 clear_cache = args.clear_cache
 iterm_split = args.iterm_split
 quiet = args.quiet
+customize_prompt = args.customize_prompt
 
 json_file = download_testenv(setup_id, force=clear_cache)
 testenv = read_testenv(json_file)
@@ -368,6 +385,9 @@ if node_type != 'all':
         format(node_type, node_id)
     logger.info("Connecting to {} as {}/{}".format(ip_addr, user_name,
                                                    password))
+    if customize_prompt:
+        update_prompt(ip_addr, user_name, password, node_type)
+
     call([ssh_script, '-l', user_name, '-p', password, ip_addr])
 else:  # Open sessions for all setup nodes
     # Build ssh commands
@@ -379,6 +399,10 @@ else:  # Open sessions for all setup nodes
         for i in xrange(len(testenv['data'][t])):
             ip_addr = testenv['data'][t][i]['ip_address']
             node_hostname = testenv['data'][t][i]['hostname']
+
+            if customize_prompt:
+                update_prompt(ip_addr, user_name, password, t)
+
             logger.info("Connecting to {} ({} {}/{})".format(
                 node_hostname, ip_addr, user_name, password))
             if ip_addr is None:
