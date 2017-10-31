@@ -268,7 +268,7 @@ end tell
 
 def osx_is_installed(app_name):
     cmd = ["osascript", "-e", 'exists application \"{}\"'.format(app_name)]
-    logger.debug("Executing {}".format(cmd))
+    logger.info("Executing {}".format(cmd))
     success = call(cmd) == 0
     logger.info("App '{}' installed: {}".format(app_name, success))
     return success
@@ -305,7 +305,7 @@ parser.add_argument('-i', '--identity_file', dest='public_key',
 parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
                     default=False, help="Add key to vHeads")
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
-                    default="", help="Override OS X Terminal emulator detection")
+                    default="", help="Override OS X Terminal emulator detection (iTerm/Terminal)")
 parser.add_argument('-s', '--iterm_split', dest='iterm_split', action='store_const',
                     const='true', default='false', help="(iTerm only) split sessions by node type")
 parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
@@ -393,9 +393,9 @@ else:  # Open sessions for all setup nodes
         connect_gnome_term(cmds)
     elif os_name == 'Darwin':
         if not mac_term:
-            mac_term = "iTerm2" if osx_is_installed("iTerm2") else "Terminal"
+            mac_term = "iTerm" if osx_is_installed("iTerm") else "Terminal"
 
-        if mac_term == "iTerm2":
+        if mac_term == "iTerm":
             connect_iterm(setup_id, node_groups, split=iterm_split,
                           messages=problems)
         elif mac_term == "Terminal":
