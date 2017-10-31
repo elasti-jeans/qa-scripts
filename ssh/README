@@ -1,5 +1,17 @@
 == Description ==
 Connect to a setup node (or all nodes) by cluster id on eLab
+You can either connect to a single node by specifying its type and, optionally, id.
+Alternatively, you can open connections to all the nodes using a single command.
+On Linux, gnome-terminal is used.
+On OSX, iTerm is used if available, and Terminal if not.
+
+IMPORTANT:
+You won't be able to connect to vHeads w/o placing your public key there.
+This operation is only needed once per setup, and is performed by passing -k.
+
+NOTE:
+You can set a custom prompt with date and exit code by passing -P.
+This can take a few moments, and is only needed once per setup.
 
 == Requirements ==
 
@@ -12,10 +24,10 @@ sudo easy_install pexpect
 == Usage ==
 
     Examples:
-        # Open a session to each node in setup 208
+        # Classic first connection - will place your public key, update the prompt and open a session to each node in setup 208
+        ssh2env.py 208 -Pka
+        # Classic n>1 connection - will open a session to each node in setup 208
         ssh2env.py 208 -a
-        # Add your public key (only needed once/setup) to all nodes and open a session to each node in setup 208
-        ssh2env.py 208 -ka
         # Connect to emanage 0 on setup 208
         ssh2env.py 208 -e0
         # Skipping the id part will connect to the first node (id=0) of the requested type - same as above
@@ -23,10 +35,11 @@ sudo easy_install pexpect
         # Clear cached json and connect to loader 5 on setup 208
         ssh2env.py 208 -c -l5
 
-
+dbian_chroot:+()jeans@jeans-ThinkPad-T470s:~/Documents/workspace/qa-scripts/ssh(master)$ ./ssh2env.py -h
+2017/10/31 17:04:29 [ssh2env.py/init_log] INFO: Log initialized - logging to ./ssh2env.log
 usage: ssh2env.py [-h] [-l [LOADER_ID] | -e [EMANAGE_ID] | -v [VHEAD_ID] | -f
-                  | -a] [-u USER_NAME] [-p PASSWORD] [-i PUBLIC_KEY] [-k]
-                  [-m MAC_TERM] [-c]
+                  | -a] [-u USER_NAME] [-p PASSWORD] [-k] [-i PUBLIC_KEY]
+                  [-m MAC_TERM] [-s] [-q] [-P] [-c]
                   setup_id
 
 Connect to a test setup node specified by type [and id]
@@ -48,10 +61,15 @@ optional arguments:
                         User name
   -p PASSWORD, --password PASSWORD
                         User password
+  -k, --add_key         Add your public key to all vHeads
   -i PUBLIC_KEY, --identity_file PUBLIC_KEY
                         Identity (public key) file
-  -k, --add_key         Add key to vHeads
   -m MAC_TERM, --mac_term MAC_TERM
-                        Mac Os X Terminal emulator
+                        Override OS X Terminal emulator detection
+                        (iTerm/Terminal)
+  -s, --iterm_split     (iTerm only) split sessions by node type
+  -q, --quiet           Do not issue sound alerts
+  -P, --customize_prompt
+                        Customize prompt on remote hosts
   -c, --clear_cache     Clear cached json for the specified setup id
 
