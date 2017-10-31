@@ -362,6 +362,10 @@ if add_key:
         add_public_key(key_file, emanage_vip_addr, vhead_ip_addr)
 
 if node_type != 'all':
+    assert ip_addr is not None,\
+        "Requested IP address for the requested node ({} {}) is not specified "\
+        "in eLab. Try refreshing the cache (-c) and contact IT if that fails.".\
+        format(node_type, node_id)
     logger.info("Connecting to {} as {}/{}".format(ip_addr, user_name,
                                                    password))
     call([ssh_script, '-l', user_name, '-p', password, ip_addr])
