@@ -225,7 +225,6 @@ tell application "iTerm"
     end tell
 end tell
 
-say "Connected to test setup {2}"
 {3}
 """
     osa_file = '/tmp/iterm2.osa'
@@ -240,10 +239,12 @@ say "Connected to test setup {2}"
         list_defs += 'set {}_cmds to {{"{}"}}\n'.format(t, '", "'.join(cmds))
 
     say = ""
-    if messages:
-        say = 'say "{}"'.format('".\n"'.join(messages))
+    if not quiet:
+        say = ['say "Connected to test setup {}"'.format(setup_id)]
+        if messages:
+            say.extend(['say "{}"'.format(m) for m in messages])
     with open(osa_file, 'w') as f:
-        f.write(osa_iterm.format(split, list_defs, setup_id, say))
+        f.write(osa_iterm.format(split, list_defs, setup_id, "\n".join(say)))
     cmd = ['osascript', osa_file]
     call(cmd)
 
@@ -307,6 +308,8 @@ parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
                     default="", help="Override OS X Terminal emulator detection")
 parser.add_argument('-s', '--iterm_split', dest='iterm_split', action='store_const',
                     const='true', default='false', help="(iTerm only) split sessions by node type")
+parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
+                    default='false', help="Do not issue sound alerts")
 parser.add_argument('-c', '--clear_cache', dest='clear_cache',
                     action='store_true', default=False,
                     help="Clear cached json for the specified setup id")
@@ -326,6 +329,7 @@ add_key = args.add_key
 mac_term = args.mac_term
 clear_cache = args.clear_cache
 iterm_split = args.iterm_split
+quiet = args.quiet
 
 json_file = download_testenv(setup_id, force=clear_cache)
 testenv = read_testenv(json_file)
@@ -376,7 +380,8 @@ else:  # Open sessions for all setup nodes
             if ip_addr is None:
                 logger.error("Skipping {}, since eLab reports its IP as null".
                              format(testenv['data'][t][i]['hostname']))
-                problems.append("Skipped {} {} due to missing IP address".format(t, i))
+                problems.append("Skipped {} {} due to missing IP address".
+                                format(t, i))
             else:
                 cmd = [os.path.abspath(ssh_script), '-l', user_name, '-p',
                        password, ip_addr]
@@ -391,7 +396,8 @@ else:  # Open sessions for all setup nodes
             mac_term = "iTerm2" if osx_is_installed("iTerm2") else "Terminal"
 
         if mac_term == "iTerm2":
-            connect_iterm(setup_id, node_groups, split=iterm_split, messages=problems)
+            connect_iterm(setup_id, node_groups, split=iterm_split,
+                          messages=problems)
         elif mac_term == "Terminal":
             connect_terminal(cmds)
         else:
