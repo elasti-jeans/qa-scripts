@@ -25,27 +25,29 @@ sudo easy_install pexpect
 
     Examples:
         # Classic first connection - will place your public key, update the prompt and open a session to each node in setup 208
-        ssh2env.py 208 -Pka
-        # Classic n>1 connection - will open a session to each node in setup 208
-        ssh2env.py 208 -a
-        # Connect to emanage 0 on setup 208
+        ssh2env.py 208 -Pk
+        # Classic connection once they keys are in place - will open a session to each node in setup 208
+        ssh2env.py 208
+        # Connect to the first emanage node on setup 208
         ssh2env.py 208 -e0
         # Skipping the id part will connect to the first node (id=0) of the requested type - same as above
         ssh2env.py 208 -e
         # Clear cached json and connect to loader 5 on setup 208
         ssh2env.py 208 -c -l5
+        # Disable split-tab mode in iTerm2
+        ssh2env.py 208 -S
+        # Enable voice messages in iTerm2
+        ssh2env.py 208 --voice
 
-dbian_chroot:+()jeans@jeans-ThinkPad-T470s:~/Documents/workspace/qa-scripts/ssh(master)$ ./ssh2env.py -h
-2017/10/31 17:04:29 [ssh2env.py/init_log] INFO: Log initialized - logging to ./ssh2env.log
 usage: ssh2env.py [-h] [-l [LOADER_ID] | -e [EMANAGE_ID] | -v [VHEAD_ID] | -f
                   | -a] [-u USER_NAME] [-p PASSWORD] [-k] [-i PUBLIC_KEY]
-                  [-m MAC_TERM] [-s] [-q] [-P] [-c]
+                  [-m MAC_TERM] [-S] [--voice] [-P] [-c]
                   setup_id
 
-Connect to a test setup node specified by type [and id]
+Connect to all test setup's nodes or to one node specified by type [and id]
 
 positional arguments:
-  setup_id              JSON configuration file
+  setup_id              Numeric test setup id
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -58,17 +60,17 @@ optional arguments:
   -f, --floating_ip     eManage VIP
   -a, --all             Connect to all nodes
   -u USER_NAME, --user USER_NAME
-                        User name
+                        Node user name
   -p PASSWORD, --password PASSWORD
-                        User password
+                        Node user's password
   -k, --add_key         Add your public key to all vHeads
   -i PUBLIC_KEY, --identity_file PUBLIC_KEY
                         Identity (public key) file
   -m MAC_TERM, --mac_term MAC_TERM
                         Override OS X Terminal emulator detection
                         (iTerm/Terminal)
-  -s, --iterm_split     (iTerm only) split sessions by node type
-  -q, --quiet           Do not issue sound alerts
+  -S, --iterm_no_split  (iTerm only) Don't split sessions by node type
+  --voice               Issue sound alerts
   -P, --customize_prompt
                         Customize prompt on remote hosts
   -c, --clear_cache     Clear cached json for the specified setup id

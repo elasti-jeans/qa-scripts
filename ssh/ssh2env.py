@@ -20,7 +20,7 @@ elab_cluster_url = '{}/api/v1/system/cluster/'.format(elab_url)
 copy_id_bin = '/usr/bin/ssh-copy-id'
 ssh_script = os.path.join(mydir, 'ssh.py')
 remote_public_key = None
-copy_id_hack = True  # Remove once emanage runs openssh >= 7.3p1
+copy_id_hack = True  # Disable once emanage runs openssh >= 7.3p1
 node_types = ['emanage', 'vheads', 'loaders']
 
 
@@ -244,7 +244,8 @@ end tell
         for n in cmds_by_type[t]:
             hostnames.append(n['hostname'])
             cmds.append(" ".join(n['cmd']))
-        list_defs += 'set {}_hostnames to {{"{}"}}\n'.format(t, '", "'.join(hostnames))
+        list_defs += 'set {}_hostnames to {{"{}"}}\n'.format(t, '", "'.
+                                                             join(hostnames))
         list_defs += 'set {}_cmds to {{"{}"}}\n'.format(t, '", "'.join(cmds))
 
     say = []
@@ -287,8 +288,8 @@ logger = init_log(os.path.join(mydir, 'ssh2env.log'))
 
 # Define command line arguments
 parser = argparse.ArgumentParser(
-    description='Connect to a test setup node specified by type [and id]')
-# Only one argument in the group is accepted, and that arg is required
+    description="Connect to all test setup's nodes or to one node "
+                "specified by type [and id]")
 machine_type = parser.add_mutually_exclusive_group()
 machine_type.add_argument('-l', '--loader', dest='loaders', type=int,
                           default=0, nargs='?', action=StoreNodeTypeId,
@@ -305,9 +306,9 @@ machine_type.add_argument('-f', '--floating_ip', dest='node_type',
 machine_type.add_argument('-a', '--all', dest='node_type', action='store_const',
                           const='all', help="Connect to all nodes")
 parser.add_argument('-u', '--user', dest='user_name', default='root',
-                    help="User name")
+                    help="Node user name")
 parser.add_argument('-p', '--password', dest='password', default='123456',
-                    help="User password")
+                    help="Node user's password")
 parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
                     default=False, help="Add your public key to all vHeads")
 parser.add_argument('-i', '--identity_file', dest='public_key',
@@ -327,9 +328,7 @@ parser.add_argument('-P', '--customize_prompt', dest='customize_prompt',
 parser.add_argument('-c', '--clear_cache', dest='clear_cache',
                     action='store_true', default=False,
                     help="Clear cached json for the specified setup id")
-
-
-parser.add_argument(dest='setup_id', help="JSON configuration file")
+parser.add_argument(dest='setup_id', help="Numeric test setup id")
 args = parser.parse_args()
 
 setup_id = args.setup_id
