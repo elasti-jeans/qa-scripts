@@ -247,8 +247,8 @@ end tell
         list_defs += 'set {}_hostnames to {{"{}"}}\n'.format(t, '", "'.join(hostnames))
         list_defs += 'set {}_cmds to {{"{}"}}\n'.format(t, '", "'.join(cmds))
 
-    say = ""
-    if not quiet:
+    say = []
+    if voice:
         say = ['say "Connected to test setup {}"'.format(setup_id)]
         if messages:
             say.extend(['say "{}"'.format(m) for m in messages])
@@ -286,8 +286,8 @@ def osx_is_installed(app_name):
 logger = init_log(os.path.join(mydir, 'ssh2env.log'))
 
 # Define command line arguments
-parser = argparse.ArgumentParser(description='Connect to a test setup node '
-                                             'specified by type [and id]')
+parser = argparse.ArgumentParser(
+    description='Connect to a test setup node specified by type [and id]')
 # Only one argument in the group is accepted, and that arg is required
 machine_type = parser.add_mutually_exclusive_group()
 machine_type.add_argument('-l', '--loader', dest='loaders', type=int,
@@ -316,11 +316,11 @@ parser.add_argument('-i', '--identity_file', dest='public_key',
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
                     default="", help="Override OS X Terminal emulator "
                                      "detection (iTerm/Terminal)")
-parser.add_argument('-s', '--iterm_split', dest='iterm_split',
-                    action='store_const', const='true', default='false',
-                    help="(iTerm only) split sessions by node type")
-parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
-                    default='false', help="Do not issue sound alerts")
+parser.add_argument('-S', '--iterm_no_split', dest='iterm_split',
+                    action='store_const', const='false', default='true',
+                    help="(iTerm only) Don't split sessions by node type")
+parser.add_argument('--voice', dest='voice', action='store_true',
+                    default=False, help="Issue sound alerts")
 parser.add_argument('-P', '--customize_prompt', dest='customize_prompt',
                     action='store_true', default=False,
                     help="Customize prompt on remote hosts")
@@ -333,7 +333,7 @@ parser.add_argument(dest='setup_id', help="JSON configuration file")
 args = parser.parse_args()
 
 setup_id = args.setup_id
-node_type = args.node_type
+node_type = args.node_type if args.node_type else 'all'
 key_file = args.public_key
 if args.node_type in node_types:
     node_id = args.node_id
@@ -343,7 +343,7 @@ add_key = args.add_key
 mac_term = args.mac_term
 clear_cache = args.clear_cache
 iterm_split = args.iterm_split
-quiet = args.quiet
+voice = args.voice
 customize_prompt = args.customize_prompt
 
 json_file = download_testenv(setup_id, force=clear_cache)
