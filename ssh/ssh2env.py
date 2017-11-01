@@ -201,14 +201,12 @@ tell application "iTerm"
 
                 if split_by_node_type then
                     tell current session of w
-
                         # Create new session for each node, except the 1st one in each group
                         if ni is equal to 1 then
                             log "... in existing session"
-                            write text cmd
                         else
                             log "... in new (split) session"
-                            set s to (split horizontally with same profile command cmd)
+                            set s to (split horizontally with same profile)
                             select s
                         end if
                     end tell
@@ -221,12 +219,12 @@ tell application "iTerm"
                         end tell
                     else
                         log "Creating new tab"
-                        set t to (create tab with default profile command cmd)
-                        select t
+                        set t to (create tab with default profile)
                     end if
                 end if
 
                 tell current session
+                    write text cmd
                     delay 0.8
                     set sess_name to "{2} " & hostname
                     set name to sess_name
