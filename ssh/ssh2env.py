@@ -106,6 +106,7 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
     :param emanage_pass: eManage user's password
     :param vhead_user: vHead's user
     """
+    authorized_keys = '~/.ssh/authorized_keys'
     logger.info("Adding public key to vhead {}".format(vhead_ip))
 
     sess = ssh.SshSession(emanage_user, emanage_vip, password=emanage_pass)
@@ -127,7 +128,8 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
                 "File not found: ({})".format(local_copy_id_bin)
             sess.scp(os.path.expanduser(local_copy_id_bin), copy_id_bin)
 
-    sess.ssh("echo '' >> ~/.ssh/authorized_keys")
+    sess.ssh('ssh -o \'StrictHostKeyChecking no\' {}@{} \"echo \'\' '
+             '\\\>\\\> {}\"'.format(vhead_user, vhead_ip, authorized_keys))
     sess.ssh("{} -f -o 'StrictHostKeyChecking no' -i {} {}@{}".
              format(copy_id_bin, remote_public_key, vhead_user, vhead_ip))
 
