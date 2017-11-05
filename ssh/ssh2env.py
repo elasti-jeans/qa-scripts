@@ -159,6 +159,18 @@ def update_prompt(host, user, password, node_type=None):
     sess.scp(os.path.expanduser(fname), os.path.join(remote_path, fname))
 
 
+def say(text):
+    """Pronounce the text"""
+    say_bin = 'say'
+    if os_name == 'Linux':
+        say_bin = 'spd-say'
+
+    try:
+        call([say_bin, ". ".join(text)])
+    except OSError as ex:
+        logger.error("Failed to say message. {}".format(ex))
+
+
 def connect_gnome_term(cmds):
     """Connect to gnoe-terminal on Linux"""
     cmd = ["gnome-terminal"]
@@ -168,7 +180,7 @@ def connect_gnome_term(cmds):
     call(cmd)
 
 
-def connect_iterm(setup_id, cmds_by_type, split="true", messages=[]):
+def connect_iterm(setup_id, cmds_by_type, split="true"):
     """Connect to iTerm on OS X"""
     osa_iterm = """
 set split_by_node_type to {0}
@@ -249,8 +261,6 @@ tell application "iTerm"
         end repeat
     end tell
 end tell
-
-{3}
 """
     osa_file = '/tmp/iterm2.osa'
     list_defs = ""
@@ -264,13 +274,8 @@ end tell
                                                              join(hostnames))
         list_defs += 'set {}_cmds to {{"{}"}}\n'.format(t, '", "'.join(cmds))
 
-    say = []
-    if voice:
-        say = ['say "Connected to test setup {}"'.format(setup_id)]
-        if messages:
-            say.extend(['say "{}"'.format(m) for m in messages])
     with open(osa_file, 'w') as f:
-        f.write(osa_iterm.format(split, list_defs, setup_id, "\n".join(say)))
+        f.write(osa_iterm.format(split, list_defs, setup_id))
     cmd = ['osascript', osa_file]
     call(cmd)
 
@@ -437,11 +442,16 @@ else:  # Open sessions for all setup nodes
             mac_term = "iTerm" if osx_is_installed("iTerm") else "Terminal"
 
         if mac_term == "iTerm":
-            connect_iterm(setup_id, node_groups, split=iterm_split,
-                          messages=problems)
+            connect_iterm(setup_id, node_groups, split=iterm_split)
         elif mac_term == "Terminal":
             connect_terminal(cmds)
         else:
             raise Exception("Unsupported Mac terminal: {}".format(mac_term))
     else:
         raise Exception("Unsupported OS: {}".format(os_name))
+
+    if voice:
+        say_text = ["Connected to test setup {}".format(setup_id)]
+        if problems:
+            say_text.extend(["{}".format(m) for m in problems])
+        say(text=say_text)
