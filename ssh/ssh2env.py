@@ -10,7 +10,6 @@ import string
 import logging
 import argparse
 
-from time import sleep
 from platform import system
 from subprocess import call
 
@@ -55,35 +54,50 @@ class StoreNodeTypeId(argparse.Action):
         setattr(namespace, 'node_id', values)
 
 
+def fetch_file(url, dest, attempts=1):
+    """Download a file by URL"""
+    attempt = 0
+
+    while attempt < attempts:
+        attempt += 1
+        try:
+            urllib.urlretrieve(url, dest)
+        except IOError as ex:
+            logger.warning("Attempt {}/{} to fetch file {} failed "
+                           "(errno {}: {})".format(attempt, attempts, url,
+                                                   ex.errno, ex.strerror))
+        else:
+            logger.info("Downloaded {} from {}".format(dest, url))
+            break
+    else:
+        raise Exception("Gave up the download of {} after {} attempts".
+                        format(url, attempts))
+
+
 def download_testenv(cid, force=False):
     """Download json from eLab by setup id"""
     dest = os.path.join(mydir, cid)
     if force or not os.path.isfile(dest):
         logger.info("Downloading json for setup {} from eLab (force: {})".
                     format(cid, force))
-        try:
-            urllib.urlretrieve(elab_cluster_url+cid, cid)
-        except IOError as ex:
-            sleep(2)
-            logger.warning("Failed to download json from eLab. {}: {} "
-                           "-- retrying".format(ex.errno, ex.strerror))
-            try:
-                urllib.urlretrieve(elab_cluster_url+cid, cid)
-            except IOError as ex:
-                raise Exception("Final attempt to download json from eLab "
-                                "failed. {}: {}".format(ex.errno, ex.strerror))
+        fetch_file(elab_cluster_url+cid, dest, attempts=3)
+    else:
+        logger.info("Using cached json: {}".format(dest))
     return dest
 
 
 def read_testenv(json_file):
     """
-    Read tesenv json
+    Read testenv json
     """
     with open(json_file) as f:
         testenv = json.load(f)
 
     if testenv is None:
-        raise Exception("ERROR - failed to load data from {}".format(json_file))
+        raise Exception("Failed to load data from {}".format(json_file))
+    elif not testenv['data']:
+        raise Exception("Bad test setup json in {} - are you sure the setup id "
+                        "is correct?".format(json_file))
 
     return testenv
 
