@@ -272,6 +272,7 @@ end tell
             cmds.append(" ".join(n['cmd']))
         list_defs += 'set {}_hostnames to {{"{}"}}\n'.format(t, '", "'.
                                                              join(hostnames))
+        cmds = [c.replace('"', '\\"') for c in cmds]  # Escape double quotes
         list_defs += 'set {}_cmds to {{"{}"}}\n'.format(t, '", "'.join(cmds))
 
     with open(osa_file, 'w') as f:
@@ -406,7 +407,11 @@ if node_type != 'all':
     if customize_prompt:
         update_prompt(ip_addr, user_name, password, node_type)
 
-    call([ssh_script, '-l', user_name, '-p', password, ip_addr])
+    if node_type in ('emanage', 'emanage_vip'):
+        call([ssh_script, '-l', user_name, '-p', password, '-i', '-e',
+              "bash --rcfile <(echo '. elfs_admin; . ~/.bashrc')", ip_addr])
+    else:
+        call([ssh_script, '-l', user_name, '-p', password, ip_addr])
 else:  # Open sessions for all setup nodes
     # Build ssh commands
     cmds = []
@@ -429,8 +434,15 @@ else:  # Open sessions for all setup nodes
                 problems.append("Skipped {} {} due to missing IP address".
                                 format(t, i))
             else:
-                cmd = [os.path.abspath(ssh_script), '-l', user_name, '-p',
-                       password, ip_addr]
+                if t in ('emanage', 'emanage_vip'):
+                    cmd = [os.path.abspath(ssh_script), '-l', user_name, '-p',
+                           password, '-i', '-e', "\"bash --rcfile <(echo '. "
+                                                 "elfs_admin; . ~/.bashrc')\"",
+                           ip_addr]
+                else:
+                    cmd = [os.path.abspath(ssh_script), '-l', user_name, '-p',
+                           password, ip_addr]
+
                 node_groups[t].append({'hostname': node_hostname, 'cmd': cmd})
                 cmds.append(cmd)
 
