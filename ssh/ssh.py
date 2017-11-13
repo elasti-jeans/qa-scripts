@@ -44,6 +44,7 @@ user = 'root'
 password = None
 rcmd = None
 verbose = False
+force_interact = None
 
 
 class SshSession():
@@ -142,7 +143,6 @@ class SshSession():
             seen = self.child.expect_exact(self.keys)
 
         if seen == 1:  # Password is expected
-
             if not self.password:
                 self.password = getpass.getpass('Remote password: ')
 
@@ -171,11 +171,16 @@ class SshSession():
         self.f.close()
         return self.child
 
-    def ssh(self, command=None, handle_known_hosts=False):
-        interactive = True
-        sshcmd = "ssh -l %s %s" % (self.user, self.host)
-        if command is not None:
+    def ssh(self, command=None, handle_known_hosts=False, force_interact=None):
+        if force_interact is not None:
+            interactive = force_interact
+        elif command is None:  # We're looking for a shell
+            interactive = True
+        else:  # Assume we want to run the command and quit
             interactive = False
+
+        sshcmd = "ssh -t -l %s %s" % (self.user, self.host)
+        if command is not None:
             sshcmd = "%s \"%s\"" % (sshcmd, command)
 
         self.child = self.__exec(sshcmd, handle_known_hosts=handle_known_hosts,
@@ -232,7 +237,7 @@ def testssh(user, host, password):
 def usage(msg='', errno=0):
     print msg + """
 Usage:
-    """ + myname + """ [-l <user>] [-p <password>] [-e <cmd>] [-v] [user@]<host>
+    """ + myname + """ [-l <user>] [-p <password>] [-e <cmd>] [-v] [-i] [user@]<host>
 
 Where:
     Mandatory parameters:
@@ -242,6 +247,7 @@ Where:
     -l - user to Login with (default: """ + user + """)
     -p|--password - Password to specify
     -e - Execute command
+    -i - force Interactive mode, useful in combination with -e
     -v - Verbose
     -h - print this Help message
 """
@@ -251,7 +257,7 @@ Where:
 
 def parse_params():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hl:p:e:v", ["password="])
+        opts, args = getopt.getopt(sys.argv[1:], "hil:p:e:v", ["password="])
     except getopt.GetoptError as err:
         print str(err)  # will print something like "option -a not recognized"
         usage(errno=2)
@@ -264,9 +270,12 @@ def parse_params():
     global password
     global rcmd
     global verbose
+    global force_interact
     for o, a in opts:
         if o == "-h":
             usage(msg="%s specified" % o)
+        elif o in ("-i"):
+            force_interact = True
         elif o in ("-l"):
             user = a
         elif o in ("-p", "--password"):
@@ -287,4 +296,4 @@ def parse_params():
 if __name__ == "__main__":
     parse_params()
     s = SshSession(user, host, password=password, verbose=verbose)
-    s.ssh(command=rcmd, handle_known_hosts=True)
+    s.ssh(command=rcmd, handle_known_hosts=True, force_interact=force_interact)
