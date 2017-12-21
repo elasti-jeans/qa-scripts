@@ -20,7 +20,7 @@ copy_id_bin = '/usr/bin/ssh-copy-id'
 ssh_script = os.path.join(mydir, 'ssh.py')
 remote_public_key = None
 copy_id_hack = True  # Disable once emanage runs openssh >= 7.3p1
-node_types = ['emanage', 'vheads', 'loaders']
+node_types = ['emanage', 'vheads', 'replication_agents', 'loaders']
 
 
 def init_log(log_file='result.log', debug_level=logging.INFO):
@@ -322,6 +322,9 @@ machine_type.add_argument('-e', '--emanage', dest='emanage', type=int,
 machine_type.add_argument('-v', '--vhead', dest='vheads', type=int,
                           default=0, nargs='?', action=StoreNodeTypeId,
                           metavar='VHEAD_ID', help="vHead id")
+machine_type.add_argument('-r', '--replication_agents', dest='replication_agents', type=int,
+                          default=0, nargs='?', action=StoreNodeTypeId,
+                          metavar='REPLICATION_AGENT_ID', help="Replication agent id")
 machine_type.add_argument('-f', '--floating_ip', dest='node_type',
                           action='store_const', const='emanage_vip',
                           help="eManage VIP")
@@ -376,9 +379,11 @@ if not os.path.isfile(ssh_script):
 if node_type in node_types:
     try:
         ip_addr = testenv['data'][node_type][node_id]['ip_address']
-    except IndexError:
-        raise Exception("Setup doesn't have enough {} (total {})".
-            format(node_type, len(testenv['data'][node_type])))
+    except KeyError:
+        ip_addr = testenv['data'][node_type][node_id]['external_ip_address']
+    except IndexError:  # replication_agents don't have ip_address field
+        raise Exception("Setup doesn't have enough {} (requested zero-based id {}, total {})".
+            format(node_type, node_id, len(testenv['data'][node_type])))
 elif node_type == 'emanage_vip':
     ip_addr = testenv['data'][node_type]
 elif node_type == 'all':
