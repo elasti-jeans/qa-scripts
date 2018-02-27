@@ -39,6 +39,7 @@ import getpass
 import termios
 
 myname = os.path.basename(__file__)
+keyfile = None
 host = None
 user = 'root'
 password = None
@@ -47,7 +48,7 @@ verbose = False
 force_interact = None
 
 
-class SshSession():
+class SshSession:
 
     """Session with extra state including the password to be used."""
 
@@ -179,7 +180,10 @@ class SshSession():
         else:  # Assume we want to run the command and quit
             interactive = False
 
-        sshcmd = "ssh -t -l %s %s" % (self.user, self.host)
+        key_arg = ""
+        if keyfile:
+            key_arg = "-i %s" % keyfile
+        sshcmd = "ssh %s -t -l %s %s" % (key_arg, self.user, self.host)
         if command is not None:
             sshcmd = "%s \"%s\"" % (sshcmd, command)
 
@@ -194,8 +198,12 @@ class SshSession():
         return self.child.after
 
     def scp(self, src, dst, handle_known_hosts=False):
-        return self.__exec("scp {} {}@{}:{}".format(src, self.user, self.host,
-                                                    dst), handle_known_hosts)
+        key_arg = ""
+        if keyfile:
+            key_arg = "-i %s" % keyfile
+
+        return self.__exec("scp {} {} {}@{}:{}".format(
+            key_arg, src, self.user, self.host, dst), handle_known_hosts)
 
     def copy_id(self, identity_file, handle_known_hosts=False):
         return self.__exec("ssh-copy-id -i {} {}@{}" % (
@@ -248,6 +256,7 @@ Where:
     -p|--password - Password to specify
     -e - Execute command
     -i - force Interactive mode, useful in combination with -e
+    -k - public Key
     -v - Verbose
     -h - print this Help message
 """
@@ -257,7 +266,7 @@ Where:
 
 def parse_params():
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hil:p:e:v", ["password="])
+        opts, args = getopt.getopt(sys.argv[1:], "hil:p:e:k:v", ["password="])
     except getopt.GetoptError as err:
         print str(err)  # will print something like "option -a not recognized"
         usage(errno=2)
@@ -265,6 +274,7 @@ def parse_params():
     if len(sys.argv) < 2:
         usage(msg="Missing parameters", errno=2)
 
+    global keyfile
     global host
     global user
     global password
@@ -276,6 +286,8 @@ def parse_params():
             usage(msg="%s specified" % o)
         elif o in ("-i"):
             force_interact = True
+        elif o in ("-k"):
+            keyfile = a
         elif o in ("-l"):
             user = a
         elif o in ("-p", "--password"):

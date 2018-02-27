@@ -14,11 +14,13 @@ from platform import system
 from subprocess import call
 
 mydir = os.path.dirname(sys.argv[0])
-elab_url = 'http://elab.il.elastifile.com'
+# elab_url = 'http://elab.il.elastifile.com'
+elab_url = 'http://elab-staging.il.elastifile.com'
 elab_cluster_url = '{}/api/v1/system/cluster/'.format(elab_url)
+elab_site_url = '{}/api/v1/site/'.format(elab_url)
 copy_id_bin = '/usr/bin/ssh-copy-id'
 ssh_script = os.path.join(mydir, 'ssh.py')
-remote_public_key = None
+remote_identity_file = None
 copy_id_hack = True  # Disable once emanage runs openssh >= 7.3p1
 node_types = ['emanage', 'vheads', 'replication_agents', 'loaders']
 
@@ -75,7 +77,7 @@ def fetch_file(url, dest, attempts=1):
 
 
 def download_testenv(cid, force=False):
-    """Download json from eLab by setup id"""
+    """Download cluster json from eLab by setup id"""
     dest = os.path.join(mydir, cid)
     if force or not os.path.isfile(dest):
         logger.info("Downloading json for setup {} from eLab (force: {})".
@@ -86,20 +88,32 @@ def download_testenv(cid, force=False):
     return dest
 
 
-def read_testenv(json_file):
+def download_site(site_name, force=False):
+    """Download site json from eLab by site name"""
+    dest = os.path.join(mydir, site_name)
+    if force or not os.path.isfile(dest):
+        logger.info("Downloading json for site {} from eLab (force: {})".
+                    format(site_name, force))
+        fetch_file(elab_site_url+site_name, dest, attempts=3)
+    else:
+        logger.info("Using cached json: {}".format(dest))
+    return dest
+
+
+def read_elab_json(json_file):
     """
-    Read testenv json
+    Read json from eLab
     """
     with open(json_file) as f:
-        testenv = json.load(f)
+        data = json.load(f)
 
-    if testenv is None:
+    if data is None:
         raise Exception("Failed to load data from {}".format(json_file))
-    elif not testenv['data']:
+    elif not data['data']:
         raise Exception("Bad test setup json in {} - are you sure the setup id "
                         "is correct?".format(json_file))
 
-    return testenv
+    return data
 
 
 def random_str(len=8, chars=string.ascii_letters+string.digits):
@@ -109,11 +123,11 @@ def random_str(len=8, chars=string.ascii_letters+string.digits):
     return "".join(random.choice(chars) for _ in xrange(len))
 
 
-def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
+def add_public_key(identity_file, emanage_vip, vhead_ip, emanage_user='root',
                    emanage_pass='123456', vhead_user='root'):
     """
     Add public key to a vHead
-    :param key_file: Public key
+    :param identity_file: Identity file (key)
     :param emanage_vip: eManage virtual IP address
     :param vhead_ip: vHead's IP address
     :param emanage_user: eManage username
@@ -131,12 +145,12 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
         copy_id_bin = os.path.join('/tmp', 'copy-id')
         local_copy_id_bin = os.path.join(mydir, 'copy-id')
 
-    global remote_public_key
-    if remote_public_key is None:  # Only done once per run
-        remote_public_key = '/tmp/{}.key.pub'.format(random_str(6))
-        assert os.path.isfile(os.path.expanduser(key_file)), \
-            "Public key not found: ({})".format(key_file)
-        sess.scp(os.path.expanduser(key_file), remote_public_key)
+    global remote_identity_file
+    if remote_identity_file is None:  # Only done once per run
+        remote_identity_file = '/tmp/{}.key.pub'.format(random_str(6))
+        assert os.path.isfile(os.path.expanduser(identity_file)), \
+            "Public key not found: ({})".format(identity_file)
+        sess.scp(os.path.expanduser(identity_file), remote_identity_file)
         if copy_id_hack:
             assert os.path.isfile(os.path.expanduser(local_copy_id_bin)), \
                 "File not found: ({})".format(local_copy_id_bin)
@@ -145,7 +159,7 @@ def add_public_key(key_file, emanage_vip, vhead_ip, emanage_user='root',
     sess.ssh('ssh -o \'StrictHostKeyChecking no\' {}@{} \"echo \'\' '
              '\\\>\\\> {}\"'.format(vhead_user, vhead_ip, authorized_keys))
     sess.ssh("{} -f -o 'StrictHostKeyChecking no' -i {} {}@{}".
-             format(copy_id_bin, remote_public_key, vhead_user, vhead_ip))
+             format(copy_id_bin, remote_identity_file, vhead_user, vhead_ip))
 
 
 def update_prompt(host, user, password, node_type=None):
@@ -330,15 +344,14 @@ machine_type.add_argument('-f', '--floating_ip', dest='node_type',
                           help="eManage VIP")
 machine_type.add_argument('-a', '--all', dest='node_type', action='store_const',
                           const='all', help="Connect to all nodes")
-parser.add_argument('-u', '--user', dest='user_name', default='root',
-                    help="Node user name")
+parser.add_argument('-u', '--user', dest='user_name', help="Node user name")
 parser.add_argument('-p', '--password', dest='password', default='123456',
                     help="Node user's password")
 parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
                     default=False, help="Add your public key to all vHeads")
 parser.add_argument('-i', '--identity_file', dest='public_key',
-                    default='~/.ssh/id_rsa.pub',
                     help="Identity (public key) file")
+                    # default='~/.ssh/id_rsa.pub'
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
                     default="", help="Override OS X Terminal emulator "
                                      "detection (iTerm/Terminal)")
@@ -358,10 +371,10 @@ args = parser.parse_args()
 
 setup_id = args.setup_id
 node_type = args.node_type if args.node_type else 'all'
-key_file = args.public_key
+identity_file_override = args.public_key
 if args.node_type in node_types:
     node_id = args.node_id
-user_name = args.user_name
+override_user_name = args.user_name
 password = args.password
 add_key = args.add_key
 mac_term = args.mac_term
@@ -370,18 +383,47 @@ iterm_split = args.iterm_split
 voice = args.voice
 customize_prompt = args.customize_prompt
 
-json_file = download_testenv(setup_id, force=clear_cache)
-testenv = read_testenv(json_file)
-
 if not os.path.isfile(ssh_script):
     raise Exception("SSH script {} not found".format(ssh_script))
+
+# Fetch cluster data
+json_file = download_testenv(setup_id, force=clear_cache)
+testenv = read_elab_json(json_file)
+
+# Fetch site data
+site = testenv['data']['site']
+site_json_file = download_site(site, force=clear_cache)
+site_data = read_elab_json(site_json_file)
+
+# Set login
+user_name = site_data['data']['eloader']['user']
+if override_user_name:
+    user_name = override_user_name
+if not user_name:
+    user_name = 'root'
+
+# Identity (key) file
+identity_file = None
+if identity_file_override:
+    identity_file = identity_file_override
+else:
+    auth_key = site_data['data']['eloader']['prikey']
+    if auth_key:
+        identity_file = '/tmp/key.pub'
+        logger.info("Saving eLab key as {}".format(identity_file))
+        if os.path.exists(identity_file):
+            os.remove(identity_file)
+        with open(identity_file, 'w') as f:
+            f.writelines(auth_key)
+            # f.writelines("\n")
+        os.chmod(identity_file, 0400)
 
 if node_type in node_types:
     try:
         ip_addr = testenv['data'][node_type][node_id]['ip_address']
-    except KeyError:
+    except KeyError:  # replication_agents don't have ip_address field
         ip_addr = testenv['data'][node_type][node_id]['external_ip_address']
-    except IndexError:  # replication_agents don't have ip_address field
+    except IndexError:
         raise Exception("Setup doesn't have enough {} (requested zero-based id {}, total {})".
             format(node_type, node_id, len(testenv['data'][node_type])))
 elif node_type == 'emanage_vip':
@@ -400,9 +442,13 @@ if add_key:
         vhead_ip_addr = testenv['data']['vheads'][i]['ip_address']
         logger.info("Adding your public key to {} ({})".format(
             vhead_ip_addr, testenv['data']['vheads'][i]['hostname']))
-        add_public_key(key_file, emanage_vip_addr, vhead_ip_addr)
+        add_public_key(identity_file, emanage_vip_addr, vhead_ip_addr)
 
-if node_type != 'all':
+key_arg = ""
+if identity_file:
+    key_arg = "-k {}".format(identity_file)
+
+if node_type != 'all':  # Connect to a specific VM
     assert ip_addr is not None,\
         "Requested IP address for the requested node ({} {}) is not specified "\
         "in eLab. Try refreshing the cache (-c) and contact IT if that fails.".\
@@ -412,11 +458,15 @@ if node_type != 'all':
     if customize_prompt:
         update_prompt(ip_addr, user_name, password, node_type)
 
+    cmd = [os.path.abspath(ssh_script)]
+    if key_arg:
+        cmd.append(key_arg)
+    cmd.extend(['-l', user_name, '-p', password])
     if node_type in ('emanage', 'emanage_vip'):
-        call([ssh_script, '-l', user_name, '-p', password, '-i', '-e',
-              "bash --rcfile <(echo '. elfs_admin; . ~/.bashrc')", ip_addr])
-    else:
-        call([ssh_script, '-l', user_name, '-p', password, ip_addr])
+        cmd.extend(['-i', '-e', "bash --rcfile <(echo '. elfs_admin; . ~/.bashrc')", ip_addr])
+    else:  # Regular VM, e.g. loader
+        cmd.append(ip_addr)
+    call(cmd)
 else:  # Open sessions for all setup nodes
     # Build ssh commands
     cmds = []
@@ -439,14 +489,14 @@ else:  # Open sessions for all setup nodes
                 problems.append("Skipped {} {} due to missing IP address".
                                 format(t, i))
             else:
+                cmd = [os.path.abspath(ssh_script)]
+                if key_arg:
+                    cmd.append(key_arg)
+                cmd.extend(['-l', user_name, '-p', password])
                 if t in ('emanage', 'emanage_vip'):
-                    cmd = [os.path.abspath(ssh_script), '-l', user_name, '-p',
-                           password, '-i', '-e', "\"bash --rcfile <(echo '. "
-                                                 "elfs_admin; . ~/.bashrc')\"",
-                           ip_addr]
+                    cmd.extend(['-i', '-e', "\"bash --rcfile <(echo '. elfs_admin; . ~/.bashrc')\"", ip_addr])
                 else:
-                    cmd = [os.path.abspath(ssh_script), '-l', user_name, '-p',
-                           password, ip_addr]
+                    cmd.append(ip_addr)
 
                 node_groups[t].append({'hostname': node_hostname, 'cmd': cmd})
                 cmds.append(cmd)
