@@ -351,7 +351,6 @@ parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
                     default=False, help="Add your public key to all vHeads")
 parser.add_argument('-i', '--identity_file', dest='public_key',
                     help="Identity (public key) file")
-                    # default='~/.ssh/id_rsa.pub'
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
                     default="", help="Override OS X Terminal emulator "
                                      "detection (iTerm/Terminal)")
@@ -372,6 +371,7 @@ args = parser.parse_args()
 setup_id = args.setup_id
 node_type = args.node_type if args.node_type else 'all'
 identity_file_override = args.public_key
+node_id = 0
 if args.node_type in node_types:
     node_id = args.node_id
 override_user_name = args.user_name
@@ -403,7 +403,7 @@ if not user_name:
     user_name = 'root'
 
 # Identity (key) file
-identity_file = None
+identity_file = '~/.ssh/id_rsa.pub'  # Default value
 if identity_file_override:
     identity_file = identity_file_override
 else:
@@ -415,7 +415,6 @@ else:
             os.remove(identity_file)
         with open(identity_file, 'w') as f:
             f.writelines(auth_key)
-            # f.writelines("\n")
         os.chmod(identity_file, 0400)
 
 if node_type in node_types:
@@ -463,7 +462,11 @@ if node_type != 'all':  # Connect to a specific VM
         cmd.append(key_arg)
     cmd.extend(['-l', user_name, '-p', password])
     if node_type in ('emanage', 'emanage_vip'):
-        cmd.extend(['-i', '-e', "bash --rcfile <(echo '. elfs_admin; . ~/.bashrc')", ip_addr])
+        if user_name != "root":  # Fix elfs_admin access rights
+            chmod_cmd = list(cmd)
+            chmod_cmd.extend(['-e', 'sudo chmod a+X ~root', ip_addr])
+            call(chmod_cmd)
+        cmd.extend(['-i', '-e', "bash --rcfile <(echo '. ~root/elfs_admin; . ~/.bashrc')", ip_addr])
     else:  # Regular VM, e.g. loader
         cmd.append(ip_addr)
     call(cmd)
