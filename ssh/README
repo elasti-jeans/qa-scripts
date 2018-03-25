@@ -24,19 +24,19 @@ sudo easy_install pexpect
 == Usage ==
 
     Examples:
-        # Classic first connection - will place your public key, update the prompt and open a session to each node in setup 208
-        ssh2env.py 208 -Pk
-        # Classic connection once they keys are in place - will open a session to each node in setup 208
+        # Classic first connection - will fetch the configuration from eLab, place your key on vheads, update the prompt, and open a session to each node in setup 208
+        ssh2env.py 208 -ckP
+        # Classic connection once the keys are in place - will open a session to each node in setup 208
         ssh2env.py 208
         # Connect to the first emanage node on setup 208
         ssh2env.py 208 -e0
         # Skipping the id part will connect to the first node (id=0) of the requested type - same as above
         ssh2env.py 208 -e
-        # Clear cached json and connect to loader 5 on setup 208
+        # Clear cached json and connect to loader #5 on setup 208
         ssh2env.py 208 -c -l5
         # Disable split-tab mode in iTerm2
         ssh2env.py 208 -S
-        # Enable voice messages in iTerm2
+        # Enable voice messages
         ssh2env.py 208 --voice
 
 usage: ssh2env.py [-h] [-l [LOADER_ID] | -e [EMANAGE_ID] | -v [VHEAD_ID] | -f
