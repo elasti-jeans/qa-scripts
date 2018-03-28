@@ -92,6 +92,20 @@ class SshSession:
         self.child.setwinsize(a[0], a[1])
         # print 'NEW WINSIZE: ', self.child.getwinsize()
 
+    # ssh stopped storing the ip in known_hosts, and provides an easier way to clean up the offending entries
+    def new_style_cleanup(self, lines):
+        remove_command_identifier = "ssh-keygen"
+        for line in lines:
+            if remove_command_identifier in line:
+                remove_cmd = line.strip()
+                print "Executing %s " % remove_cmd
+                res = os.system(remove_cmd)
+                if res == 0:
+                    return True
+                else:
+                    print "Previous command failed with exit code: %s" % res
+        return false
+
     def __exec(self, command, handle_known_hosts=False, interactive=False):
         """Execute a command on the remote host. Return the output."""
 
@@ -108,11 +122,14 @@ class SshSession:
             pass
 
         if seen == 2:  # Bad known_hosts entry
+            print "Handling known_hosts..."
             lines = self.child.readlines()
             for line in lines:
                 self.f.write(line)
             if handle_known_hosts:
-                self.remove_known_hosts_entry(self.host)
+                if not self.new_style_cleanup(lines):
+                    self.remove_known_hosts_entry(self.host)
+                # Connect again after known_hosts were cleaned up
                 print "Executing %s " % command
                 self.child = spawn(command)
                 seen = self.child.expect_exact(self.keys)
