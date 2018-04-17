@@ -365,6 +365,8 @@ parser.add_argument('-P', '--customize_prompt', dest='customize_prompt',
 parser.add_argument('-c', '--clear_cache', dest='clear_cache',
                     action='store_true', default=False,
                     help="Clear cached json for the specified setup id")
+parser.add_argument('-x', '--execute', dest='cmd', type=str, action='store',
+                    metavar='CMD', help="Command to be executed (doesn't echo the result at the moment)")
 parser.add_argument(dest='setup_id', help="Numeric test setup id")
 args = parser.parse_args()
 
@@ -379,6 +381,7 @@ password = args.password
 add_key = args.add_key
 mac_term = args.mac_term
 clear_cache = args.clear_cache
+remote_cmd = args.cmd
 iterm_split = args.iterm_split
 voice = args.voice
 customize_prompt = args.customize_prompt
@@ -458,6 +461,8 @@ if node_type != 'all':  # Connect to a specific VM
         update_prompt(ip_addr, user_name, password, node_type)
 
     cmd = [os.path.abspath(ssh_script)]
+    if remote_cmd:
+        cmd.extend(['-e', remote_cmd])
     if key_arg:
         cmd.append(key_arg)
     cmd.extend(['-l', user_name, '-p', password])
