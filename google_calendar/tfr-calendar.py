@@ -12,14 +12,14 @@ CALENDAR_NAME = 'Tesla Point Of Contact'
 
 def init_args():
     # Define command line arguments
-    ap = argparse.ArgumentParser(
-        description='View/edit TFR schedule. Uses Google Calendar API, which '
-                    'requires the relevant API access to be enabled')
+    ap = argparse.ArgumentParser(description='View/edit TFR schedule. Uses Google Calendar API, '
+                                             'which requires the relevant API access to be enabled. '
+                                             'Usage: ./tfr-calendar.py -a -r2')
     # Only one argument in the group is accepted
     ap.add_argument('-l', '--list', dest='list', action='store_true', default=True,
                     help="List future events")
     ap.add_argument('-L', dest='list', action='store_false',
-                    help="List future events")
+                    help="Do not list future events")
     ap.add_argument('-a', '--add', dest='add', action='store_true', default=False,
                     help="Add new events after the last existing one")
     ap.add_argument('-r', '--repeat', dest='repeat', type=int, default=1,
@@ -58,7 +58,10 @@ def events_print(event_list):
         fields = ['id', 'status', 'summary', 'start', 'end', 'attendees']
         event_desc = ""
         for field in fields:
-            event_desc = "{} {}: {}".format(event_desc, field, event[field])
+            try:
+                event_desc = "{} {}: {}".format(event_desc, field, event[field])
+            except KeyError:
+                pass
         print("Event:{}".format(event_desc))
 
 
@@ -69,8 +72,12 @@ def get_events_errors(event_list) -> []:
     for event in event_list:
         fields = ['id', 'status', 'summary', 'start', 'end', 'attendees']
         event_desc = ""
+
         for field in fields:
-            event_desc = "{} {}: {}".format(event_desc, field, event[field])
+            try:
+                event_desc = "{} {}: {}".format(event_desc, field, event[field])
+            except KeyError:
+                print("WARN: Missing value for key {}".format(field))
         # print("Event:{}".format(event_desc))
 
         if last_event:
@@ -98,7 +105,6 @@ args = init_args()
 # Initialize the Calendar API
 cal_api = GoogleCalendarAPI(args.secret_file, args.credentials_file, args.dry_run)
 
-
 # Get the TFR calendar
 cal = cal_api.get_calendar(CALENDAR_NAME)
 print("Calendar '{}' id: {}".format(CALENDAR_NAME, cal['id']))
@@ -115,9 +121,15 @@ warnings = get_events_errors(events)
 for warning in warnings:
     print("WARN: {}".format(warning))
 
-last_event = events[-1]
-print("Last TFR in '{}' calendar: '{}' ends on {}".format(
-    CALENDAR_NAME, last_event['summary'], last_event['end']['date']))
+last_event = None
+if not events:
+    print("No future events found")
+    # TODO: Set last_event to last Monday (period start)
+else:
+    last_event = events[-1]
+    print("Last TFR in '{}' calendar: '{}' ends on {}".format(
+        CALENDAR_NAME, last_event['summary'], last_event['end']['date']))
+
 
 def load_tfrs() -> {}:
     attendees = dict()
@@ -133,11 +145,13 @@ def load_tfrs() -> {}:
 
     return attendees
 
+
 if args.add:
     tfrs = load_tfrs()
     print(tfrs)
 
     print("Updating TFR schedule - repeated {} times".format(args.repeat))
+
     start_dt = datetime.datetime.strptime(events[-1]['end']['date'],
                                           GCAL_DATE_FORMAT)
     schedule_tfr(cal['id'], start=start_dt, attendees=tfrs,
