@@ -14,10 +14,7 @@ from platform import system
 from subprocess import call
 
 mydir = os.path.dirname(sys.argv[0])
-# elab_url = 'http://elab.il.elastifile.com'
-elab_url = 'http://elab-staging.il.elastifile.com'
-elab_cluster_url = '{}/api/v1/system/cluster/'.format(elab_url)
-elab_site_url = '{}/api/v1/site/'.format(elab_url)
+
 copy_id_bin = '/usr/bin/ssh-copy-id'
 ssh_script = os.path.join(mydir, 'ssh.py')
 remote_identity_file = None
@@ -351,6 +348,8 @@ parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
                     default=False, help="Add your public key to all vHeads")
 parser.add_argument('-i', '--identity_file', dest='public_key',
                     help="Identity (public key) file")
+parser.add_argument('-E', '--elab', dest='elab_url', default='http://elab.il.elastifile.com',
+                    help="eLab URL")
 parser.add_argument('-m', '--mac_term', dest='mac_term', action='store',
                     default="", help="Override OS X Terminal emulator "
                                      "detection (iTerm/Terminal)")
@@ -385,6 +384,10 @@ remote_cmd = args.cmd
 iterm_split = args.iterm_split
 voice = args.voice
 customize_prompt = args.customize_prompt
+elab_url = args.elab_url
+
+elab_cluster_url = '{}/api/v1/system/cluster/'.format(elab_url)
+elab_site_url = '{}/api/v1/site/'.format(elab_url)
 
 if not os.path.isfile(ssh_script):
     raise Exception("SSH script {} not found".format(ssh_script))
