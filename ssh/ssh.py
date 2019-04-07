@@ -104,7 +104,7 @@ class SshSession:
                     return True
                 else:
                     print "Previous command failed with exit code: %s" % res
-        return false
+        return False
 
     def __exec(self, command, handle_known_hosts=False, interactive=False):
         """Execute a command on the remote host. Return the output."""
