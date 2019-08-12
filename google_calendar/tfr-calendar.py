@@ -100,6 +100,17 @@ def get_events_errors(event_list) -> []:
     return errors
 
 
+def last_monday():
+    date = datetime.datetime.today()
+    weekday = date.weekday()
+
+    sunday = 6
+    if weekday != sunday:
+        date -= datetime.timedelta(days=weekday)
+
+    return date
+
+
 args = init_args()
 
 # Initialize the Calendar API
@@ -122,13 +133,16 @@ for warning in warnings:
     print("WARN: {}".format(warning))
 
 last_event = None
-if not events:
-    print("No future events found")
-    # TODO: Set last_event to last Monday (period start)
-else:
+
+if events:
     last_event = events[-1]
     print("Last TFR in '{}' calendar: '{}' ends on {}".format(
         CALENDAR_NAME, last_event['summary'], last_event['end']['date']))
+else:
+    print("No future events found - assuming last Sunday")
+
+    last_event = {'end': {'date': '{}'.format(last_monday().date())}}
+    events = [last_event]
 
 
 def load_tfrs() -> {}:
