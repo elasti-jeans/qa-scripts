@@ -63,7 +63,11 @@ def get_cluster(project):
     json_as_text = subprocess.check_output(['docker', 'run', '--rm', '--privileged', '-v', '/tmp:/tmp', image+':'+tag,
                                             'gcp', 'list_ips', '--project-id', project, '--json'])
 
-    data = json.loads(json_as_text)
+    try:
+        data = json.loads(json_as_text)
+    except ValueError as ex:
+        raise Exception("Bad JSON: {} === {}".format(ex, json_as_text))
+
     if data is None:
         raise Exception("Malformed JSON: {}".format(json_as_text))
     elif not data['data']:
