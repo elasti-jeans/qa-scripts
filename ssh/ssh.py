@@ -65,6 +65,7 @@ class SshSession:
             ']#',
             ']$',
             '~# ',
+            '~$ ',
             'Command not found.',  # Errors should come last
             'Name or service not known',
             'No route to host',
@@ -174,8 +175,8 @@ class SshSession:
                 if not self.child.isalive():
                     seen = self.child.expect_exact(self.keys)
 
-        elif seen > 6:  # Errors
-            if seen != 10 or interactive:  # non-interactive + EOF is ok
+        elif seen > 7:  # Errors
+            if seen != 11 or interactive:  # non-interactive + EOF is ok
                 print "FATAL ERROR ({}). Please review the output:".format(seen)
                 print self.child.before, self.child.after
 
@@ -193,10 +194,8 @@ class SshSession:
     def ssh(self, command=None, handle_known_hosts=False, force_interact=None):
         if force_interact is not None:
             interactive = force_interact
-        elif command is None:  # We're looking for a shell
+        else:  # Assume interactive shell
             interactive = True
-        else:  # Assume we want to run the command and quit
-            interactive = False
 
         key_arg = ""
         if keyfile:
@@ -204,7 +203,7 @@ class SshSession:
 
         sshcmd = "ssh %s -t -l %s %s" % (key_arg, self.user, self.host)
         if command is not None:
-            sshcmd = "%s \"%s\"" % (sshcmd, command)
+            sshcmd = "%s %s" % (sshcmd, command)
 
         self.child = self.__exec(sshcmd, handle_known_hosts=handle_known_hosts,
                                  interactive=interactive)
