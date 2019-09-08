@@ -93,7 +93,8 @@ class SshSession:
         # print 'NEW WINSIZE: ', self.child.getwinsize()
 
     # ssh stopped storing the ip in known_hosts, and provides an easier way to clean up the offending entries
-    def new_style_cleanup(self, lines):
+    @staticmethod
+    def new_style_cleanup(lines):
         remove_command_identifier = "ssh-keygen"
         for line in lines:
             if remove_command_identifier in line:
@@ -200,6 +201,7 @@ class SshSession:
         key_arg = ""
         if keyfile:
             key_arg = "-i %s" % keyfile
+
         sshcmd = "ssh %s -t -l %s %s" % (key_arg, self.user, self.host)
         if command is not None:
             sshcmd = "%s \"%s\"" % (sshcmd, command)
@@ -219,12 +221,10 @@ class SshSession:
         if keyfile:
             key_arg = "-i %s" % keyfile
 
-        return self.__exec("scp {} {} {}@{}:{}".format(
-            key_arg, src, self.user, self.host, dst), handle_known_hosts)
+        return self.__exec("scp {} {} {}@{}:{}".format(key_arg, src, self.user, self.host, dst), handle_known_hosts)
 
     def copy_id(self, identity_file, handle_known_hosts=False):
-        return self.__exec("ssh-copy-id -i {} {}@{}" % (
-            identity_file, self.user, self.host), handle_known_hosts)
+        return self.__exec("ssh-copy-id -i {} {}@{}".format(identity_file, self.user, self.host), handle_known_hosts)
 
     def exists(self, file):
         """Retrieve file permissions of specified remote file."""
@@ -234,8 +234,8 @@ class SshSession:
         else:
             return seen.split()[0]  # Return permission field of listing.
 
-    def remove_known_hosts_entry(
-            self, host, known_hosts_file='~/.ssh/known_hosts', tmpfile=None):
+    @staticmethod
+    def remove_known_hosts_entry(host, known_hosts_file='~/.ssh/known_hosts', tmpfile=None):
         known_hosts_file = os.path.expanduser(known_hosts_file)
         print "Removing bad host entry (%s) from %s" % (host, known_hosts_file)
         if tmpfile is None:
@@ -301,17 +301,17 @@ def parse_params():
     for o, a in opts:
         if o == "-h":
             usage(msg="%s specified" % o)
-        elif o in ("-i"):
+        elif o in "-i":
             force_interact = True
-        elif o in ("-k"):
-            keyfile = a
+        elif o in "-k":
+            keyfile = keyfile = os.path.expanduser(a)
         elif o in ("-l"):
             user = a
         elif o in ("-p", "--password"):
             password = a
-        elif o in ("-e"):
+        elif o in "-e":
             rcmd = a
-        elif o in ("-v"):
+        elif o in "-v":
             verbose = True
 
     host = args[0]
