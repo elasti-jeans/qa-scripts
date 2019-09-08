@@ -79,56 +79,6 @@ def random_str(len=8, chars=string.ascii_letters+string.digits):
     return "".join(random.choice(chars) for _ in xrange(len))
 
 
-def add_public_key(identity_file, emanage_vip, vhead_ip, emanage_user='root',
-                   emanage_pass='123456', vhead_user='root'):
-    """
-    Add public key to a vHead
-    :param identity_file: Identity file (key)
-    :param emanage_vip: eManage virtual IP address
-    :param vhead_ip: vHead's IP address
-    :param emanage_user: eManage username
-    :param emanage_pass: eManage user's password
-    :param vhead_user: vHead's user
-    """
-    authorized_keys = '~/.ssh/authorized_keys'
-    logger.info("Adding public key to vhead {}".format(vhead_ip))
-
-    sess = ssh.SshSession(emanage_user, emanage_vip, password=emanage_pass)
-
-    if copy_id_hack:
-        # openssh requires the private key to be present to be able to copy id
-        # https://bugzilla.mindrot.org/show_bug.cgi?id=2110
-        copy_id_bin = os.path.join('/tmp', 'copy-id')
-        local_copy_id_bin = os.path.join(mypath, 'copy-id')
-
-    global remote_identity_file
-    if remote_identity_file is None:  # Only done once per run
-        remote_identity_file = '/tmp/{}.key.pub'.format(random_str(6))
-        assert os.path.isfile(os.path.expanduser(identity_file)), \
-            "Public key not found: ({})".format(identity_file)
-        sess.scp(os.path.expanduser(identity_file), remote_identity_file)
-        if copy_id_hack:
-            assert os.path.isfile(os.path.expanduser(local_copy_id_bin)), \
-                "File not found: ({})".format(local_copy_id_bin)
-            sess.scp(os.path.expanduser(local_copy_id_bin), copy_id_bin)
-
-    sess.ssh('ssh -o \'StrictHostKeyChecking no\' {}@{} \"echo \'\' '
-             '\\\>\\\> {}\"'.format(vhead_user, vhead_ip, authorized_keys))
-    sess.ssh("{} -f -o 'StrictHostKeyChecking no' -i {} {}@{}".
-             format(copy_id_bin, remote_identity_file, vhead_user, vhead_ip))
-
-
-def update_prompt(host, user, password, node_type=None):
-    """Customize node's prompt"""
-    remote_path = '/etc/profile.d'
-    fname = 'vheads-prompt.sh' if node_type == 'vheads' else 'qa-prompt.sh'
-    assert os.path.isfile(os.path.expanduser(fname)),\
-        "Prompt file not found: ({})".format(fname)
-    logger.info("Updating prompt on {}".format(host))
-    sess = ssh.SshSession(user, host, password)
-    sess.scp(os.path.expanduser(fname), os.path.join(remote_path, fname))
-
-
 logger = init_log(os.path.join(mypath, myname + '.log'))
 
 # Define command line arguments
@@ -151,13 +101,8 @@ machine_type.add_argument('-f', '--floating_ip', dest='node_type',
                           help="eManage VIP")
 parser.add_argument('-u', '--user', dest='user_name', help="Node user name", default="centos")
 parser.add_argument('-p', '--password', dest='password', default='123456', help="Node user's password")
-parser.add_argument('-k', '--add_key', dest='add_key', action='store_true',
-                    default=False, help="Add your public key to all vHeads")
 parser.add_argument('-i', '--identity_file', dest='public_key',
                     help="Identity (public key) file")
-parser.add_argument('-P', '--customize_prompt', dest='customize_prompt',
-                    action='store_true', default=False,
-                    help="Customize prompt on remote hosts")
 parser.add_argument('-x', '--execute', dest='cmd', type=str, action='store',
                     metavar='CMD', help="Command to be executed (doesn't echo the result at the moment)")
 parser.add_argument(dest='setup_id', help="Numeric test setup id")
@@ -171,9 +116,7 @@ if args.node_type in node_types:
     node_id = args.node_id
 user_name = args.user_name
 password = args.password
-add_key = args.add_key
 remote_cmd = args.cmd
-customize_prompt = args.customize_prompt
 
 
 if not os.path.isfile(ssh_script):
@@ -197,19 +140,8 @@ if node_type in node_types:
                         format(node_type, node_id, len(testenv['data'][node_type])))
 elif node_type == 'emanage_vip':
     ip_addr = testenv['data'][node_type]
-elif node_type == 'all':
-    pass
 else:
     raise Exception("Unsupported node type {}".format(node_type))
-
-# Add public key to vHeads
-if add_key:
-    emanage_vip_addr = testenv['data']['emanage_vip']
-    for i in xrange(len(testenv['data']['vheads'])):
-        vhead_ip_addr = testenv['data']['vheads'][i]['ip_address']
-        logger.info("Adding your public key to {} ({})".format(
-            vhead_ip_addr, testenv['data']['vheads'][i]['hostname']))
-        add_public_key(identity_file, emanage_vip_addr, vhead_ip_addr)
 
 key_arg = ""
 if identity_file:
@@ -221,12 +153,9 @@ assert ip_addr is not None,\
     format(node_type, node_id)
 logger.info("Connecting to {} as {}/{}".format(ip_addr, user_name, password))
 
-if customize_prompt:
-    update_prompt(ip_addr, user_name, password, node_type)
-
 cmd = [os.path.abspath(ssh_script)]
 if remote_cmd:
-    cmd.extend(['-e', remote_cmd])
+    cmd.extend(['--', remote_cmd])
 if key_arg:
     cmd.append(key_arg)
 cmd.extend(['-l', user_name, '-p', password])
@@ -236,6 +165,10 @@ if node_type in ('emanage', 'emanage_vip'):
         chmod_cmd.extend(['-e', 'sudo chmod a+X ~root', ip_addr])
         call(chmod_cmd)
     cmd.extend(['-i', '-e', "bash --rcfile <(echo '. ~root/elfs_admin; . ~/.bashrc')", ip_addr])
+elif node_type in ('vheads', 'replication_agents'):
+    emanage_ip = testenv['data']['emanage'][0]['ip_address']
+    cmd.extend(['-e', 'sudo ssh ' + ip_addr, emanage_ip])
 else:  # Regular VM, e.g. loader
     cmd.append(ip_addr)
+
 call(cmd)
