@@ -55,7 +55,8 @@ class StoreNodeTypeId(argparse.Action):
 def get_cluster(project):
     """Download cluster details via cloudctl"""
     image = 'registry.gcp.elastifile.com/tools/cloud_tools'
-    tag = 'latest'
+    # tag = 'latest'
+    tag = 'staging'
 
     # On cloudtop, may need to run
     # newgrp docker
@@ -142,32 +143,24 @@ elif node_type == 'emanage_vip':
 else:
     raise Exception("Unsupported node type {}".format(node_type))
 
-key_arg = ""
-if identity_file:
-    key_arg = "-k {}".format(identity_file)
-
 assert ip_addr is not None,\
     "Requested IP address for the requested node ({} {}) is not specified "\
     "in eLab. Try refreshing the cache (-c) and contact IT if that fails.".\
     format(node_type, node_id)
 logger.info("Connecting to {} as {}/{}".format(ip_addr, user_name, password))
 
-cmd = [os.path.abspath(ssh_script)]
-if remote_cmd:
-    cmd.extend(['--', remote_cmd])
-if key_arg:
-    cmd.append(key_arg)
-cmd.extend(['-l', user_name, '-p', password])
-if node_type in ('emanage', 'emanage_vip'):
-    if user_name != "root":  # Fix elfs_admin access rights
-        chmod_cmd = list(cmd)
-        chmod_cmd.extend(['-e', 'sudo chmod a+X ~root', ip_addr])
-        call(chmod_cmd)
-    cmd.extend(['-i', '-e', "bash --rcfile <(echo '. ~root/elfs_admin; . ~/.bashrc')", ip_addr])
-elif node_type in ('vheads', 'replication_agents'):
-    emanage_ip = testenv['data']['emanage'][0]['ip_address']
-    cmd.extend(['-e', 'sudo ssh ' + ip_addr, emanage_ip])
-else:  # Regular VM, e.g. loader
-    cmd.append(ip_addr)
 
-call(cmd)
+# if node_type in ('emanage', 'emanage_vip'):
+#     if user_name != "root":  # Fix elfs_admin access rights
+#         chmod_cmd = list(cmd)
+#         chmod_cmd.extend(['-e', 'sudo chmod a+X ~root', ip_addr])
+#         call(chmod_cmd)
+#     cmd.extend(['-i', '-e', "bash --rcfile <(echo '. ~root/elfs_admin; . ~/.bashrc')", ip_addr])
+if node_type in ('vheads', 'replication_agents'):
+    if remote_cmd != "":
+        logger.warning("Remote command is currently not supported for {}".format(node_type))
+    remote_cmd = 'sudo ssh ' + ip_addr
+    ip_addr = testenv['data']['emanage'][0]['ip_address']
+
+s = ssh.SshSession(user_name, ip_addr, verbose=True)
+s.ssh(command=remote_cmd, handle_known_hosts=True, identity_file=identity_file)

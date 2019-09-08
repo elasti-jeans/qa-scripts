@@ -191,15 +191,17 @@ class SshSession:
         self.f.close()
         return self.child
 
-    def ssh(self, command=None, handle_known_hosts=False, force_interact=None):
+    def ssh(self, identity_file="", command=None, handle_known_hosts=False, force_interact=None):
         if force_interact is not None:
             interactive = force_interact
         else:  # Assume interactive shell
             interactive = True
 
+        identity_file = identity_file if identity_file else keyfile
+
         key_arg = ""
-        if keyfile:
-            key_arg = "-i %s" % keyfile
+        if identity_file:
+            key_arg = "-i %s" % identity_file
 
         sshcmd = "ssh %s -t -l %s %s" % (key_arg, self.user, self.host)
         if command is not None:
@@ -215,10 +217,11 @@ class SshSession:
 
         return self.child.after
 
-    def scp(self, src, dst, handle_known_hosts=False):
+    def scp(self, src, dst, identity_file="", handle_known_hosts=False):
         key_arg = ""
-        if keyfile:
-            key_arg = "-i %s" % keyfile
+        identity_file = identity_file if identity_file else keyfile
+        if identity_file:
+            key_arg = "-i %s" % identity_file
 
         return self.__exec("scp {} {} {}@{}:{}".format(key_arg, src, self.user, self.host, dst), handle_known_hosts)
 
