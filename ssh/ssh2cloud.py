@@ -174,7 +174,7 @@ if node_type in ('emanage', 'emanage_vip'):
     cmd.extend(['-i', '-e', "bash --rcfile <(echo '. ~root/elfs_admin; . ~/.bashrc')", ip_addr])
 elif node_type in ('vheads', 'replication_agents'):
     emanage_ip = testenv['data']['emanage'][0]['ip_address']
-    cmd.extend(['-e', 'sudo ssh ' + ip_addr, emanage_ip])
+    cmd.extend(['-e', 'sudo ssh -o StrictHostKeyChecking=no ' + ip_addr, emanage_ip])
 else:  # Regular VM, e.g. loader
     cmd.append(ip_addr)
 
