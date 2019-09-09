@@ -60,8 +60,11 @@ def get_cluster(project):
 
     # On cloudtop, may need to run
     # newgrp docker
-    json_as_text = subprocess.check_output(['docker', 'run', '--rm', '--privileged', '-v', '/tmp:/tmp', image+':'+tag,
-                                            'gcp', 'list_ips', '--project-id', project, '--json'])
+    cloudctl_cmd = ['docker', 'run', '--rm', '--privileged', '-v', '/tmp:/tmp', image+':'+tag,
+                    'gcp', 'list_ips', '--project-id', project, '--json']
+
+    logger.info("Running command: {}".format(" ".join(cloudctl_cmd)))
+    json_as_text = subprocess.check_output(cloudctl_cmd)
 
     try:
         data = json.loads(json_as_text)
