@@ -20,7 +20,7 @@ remote_identity_file = None
 node_types = ['emanage', 'vheads', 'replication_agents', 'loaders']
 
 
-def init_log(log_file='result.log', debug_level=logging.INFO):
+def init_log(log_file='result.log', debug_level=logging.DEBUG):
     log_formatter = logging.Formatter(
         '%(asctime)s [%(filename)s/%(funcName)s] %(levelname)s: %(message)s',
         datefmt='%Y/%m/%d %H:%M:%S')
@@ -33,7 +33,6 @@ def init_log(log_file='result.log', debug_level=logging.INFO):
     log_ch.setFormatter(log_formatter)
 
     log_fh = logging.FileHandler(log_file, mode='w')  # Overwrite the log file
-    log_fh.setLevel(logging.DEBUG)  # File debug level
     log_fh.setFormatter(log_formatter)
 
     logger.addHandler(log_ch)
