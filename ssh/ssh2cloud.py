@@ -3,6 +3,7 @@
 import os
 import sys
 import ssh
+import time
 import json
 import random
 import string
@@ -14,6 +15,7 @@ from subprocess import call
 
 mypath = os.path.dirname(sys.argv[0])
 myname = os.path.basename(sys.argv[0])
+cache_dir = "/tmp/ssh2cache"
 
 ssh_script = os.path.join(mypath, 'ssh.py')
 remote_identity_file = None
@@ -100,6 +102,7 @@ parser.add_argument('-u', '--user', dest='user_name', help="Node user name", def
 parser.add_argument('-p', '--password', dest='password', default='123456', help="Node user's password")
 parser.add_argument('-i', '--identity_file', dest='public_key',
                     help="Identity (public key) file")
+parser.add_argument('-c', '--cache', dest='cache_ttl', type=int, help="Cache TTL in seconds", default="600")
 parser.add_argument('-x', '--execute', dest='cmd', type=str, action='store',
                     metavar='CMD', help="Command to be executed (doesn't echo the result at the moment)")
 parser.add_argument(dest='setup_id', help="Numeric test setup id")
@@ -114,13 +117,53 @@ if args.node_type in node_types:
 user_name = args.user_name
 password = args.password
 remote_cmd = args.cmd
+cache_ttl = args.cache_ttl
+
+cache_file = os.path.join(cache_dir, setup_id)
+
+
+def get_cluster_from_cache(setup_id):
+    if not cache_ttl:
+        logger.debug("Cache disabled")
+        return None
+
+    if not os.path.isfile(cache_file):
+        logger.debug("Cached cluster {} not found".format(setup_id))
+        return None
+
+    cache_update_time = os.path.getmtime(cache_file)
+    current_time = int(time.time())
+    if current_time - cache_update_time > cache_ttl:
+        logger.debug("Cluster cache expired - current time: {} cache mtime: {} TTL: {}, delta: {}s".
+            format(current_time, cache_update_time, cache_ttl, current_time - cache_update_time))
+        return None
+
+    logger.info("Using cached config {}".format(cache_file))
+    with open(cache_file) as f:
+        try:
+            return json.load(f)
+        except Exception as ex:
+            logger.warning("Failed loading cluster config from cache {} - {}".format(cache_file, ex))
+            return None
+
+def update_cluster_cache(cluster_id, cluster_data):
+    if not os.path.isdir(cache_dir):
+        logger.debug("Missing cache dir - creating {}".format(cache_dir))
+        os.makedirs(cache_dir)
+
+    with open(cache_file, "w") as f:
+        logger.debug("Updating cluster cache - {}".format(cache_file))
+        json.dump(cluster_data, f)
 
 
 if not os.path.isfile(ssh_script):
     raise Exception("SSH script {} not found".format(ssh_script))
 
 # Fetch cluster data
-testenv = get_cluster(setup_id)
+testenv = get_cluster_from_cache(setup_id)
+if not testenv:
+    testenv = get_cluster(setup_id)
+    update_cluster_cache(setup_id, testenv)
 
 # Identity (key) file
 identity_file = os.path.expanduser('~/.ssh/elastifile.pem')  # Default value
@@ -145,8 +188,8 @@ if identity_file:
     key_arg = "-k {}".format(identity_file)
 
 assert ip_addr is not None,\
-    "Requested IP address for the requested node ({} {}) is not specified "\
-    "in eLab. Try refreshing the cache (-c) and contact IT if that fails.".\
+    "IP address for the requested node ({} {}) is not specified in cloudctl. "\
+    "Try refreshing the cache (-c 0) and contact IT if that fails.".\
     format(node_type, node_id)
 logger.info("Connecting to {} as {}/{}".format(ip_addr, user_name, password))
 
