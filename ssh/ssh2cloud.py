@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import os
-import subprocess
 import sys
 import ssh
 import json
@@ -9,16 +8,15 @@ import random
 import string
 import logging
 import argparse
+import subprocess
 
 from subprocess import call
 
 mypath = os.path.dirname(sys.argv[0])
 myname = os.path.basename(sys.argv[0])
 
-copy_id_bin = '/usr/bin/ssh-copy-id'
 ssh_script = os.path.join(mypath, 'ssh.py')
 remote_identity_file = None
-copy_id_hack = True  # Disable once emanage runs openssh >= 7.3p1
 node_types = ['emanage', 'vheads', 'replication_agents', 'loaders']
 
 
@@ -79,14 +77,7 @@ def get_cluster(project):
     return data
 
 
-def random_str(len=8, chars=string.ascii_letters+string.digits):
-    """
-    Return random string
-    """
-    return "".join(random.choice(chars) for _ in xrange(len))
-
-
-logger = init_log(os.path.join(mypath, myname + '.log'))
+logger = init_log(os.path.join(mypath, os.path.splitext(myname)[0] + '.log'))
 
 # Define command line arguments
 parser = argparse.ArgumentParser(description="Connect to a test setup's node or to one node specified by type [and id]")
@@ -179,3 +170,4 @@ else:  # Regular VM, e.g. loader
     cmd.append(ip_addr)
 
 call(cmd)
+
