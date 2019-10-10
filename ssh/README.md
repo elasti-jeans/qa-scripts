@@ -19,6 +19,8 @@ This can take a few moments, and is only needed once per setup.
 sudo easy_install pexpect
 
 - Make sure you have a key ready to be used, e.g. ~/.ssh/id_rsa.pub
+- Make sure you have docker installed and your user can use it without sudo.
+  You can always run the script under sudo, but this is not recommended.
 
 If you don't - run ssh-keygen to create one
 
@@ -77,7 +79,8 @@ Add the following alias to your .bashrc
 alias ssh2='/path/to/qa-scripts/ssh/ssh2cloud.py -i ~/.ssh/elastifile.pem'
 ```
 
-Now connecting to your test VM is be as simple as
+Now connecting to your test VM is as simple as
 ```shell script
 ssh2 934 -l
 ```
+
