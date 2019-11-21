@@ -6,13 +6,14 @@
 : ${TEST_SCRIPT_TEMPLATE:=/tmp/io500.sh}
 : ${OUTPUT_FILE:=/tmp/io500.log}
 
+: ${IO500_REPO:="https://github.com/VI4IO/io-500-dev"}
+: ${IO500_BRANCH:="master"}
+: ${MOUNT_POINT:="/mnt/io500"}
+
 # Internal parameters
 : ${FIRST_RUN:=true}
 
 MYDIR=$(dirname $0)
-MOUNT_POINT="/mnt/io500"
-IO500_REPO="https://github.com/VI4IO/io-500-dev"
-IO500_BRANCH="master"
 TOOL_NAME=$(basename ${IO500_REPO})
 
 function logme {
@@ -44,6 +45,10 @@ if [ "$FIRST_RUN" == true ]; then
     fi
     logme "Cloning io500 repo"
     git clone --depth=1 ${IO500_REPO} -b ${IO500_BRANCH}
+
+    IO500_MAIN_SCRIPT="${TOOL_NAME}/utilities/io500_fixed.sh"
+    logme "Updating ${IO500_MAIN_SCRIPT}"
+    sed -i 's/myrun "$io500_ior_cmd -r -R $params_ior_hard" $result_file/myrun "$io500_ior_cmd -r $params_ior_hard" $result_file/' ${IO500_MAIN_SCRIPT}
 fi
 
 logme "Copying the tool to ${MOUNT_POINT}"
