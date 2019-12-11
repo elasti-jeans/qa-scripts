@@ -196,8 +196,12 @@ def get_instances_by_label(project_id: str, cluster_label: str = None) -> list:
 def cluster_hashes(instances: list) -> list:
     hashes = dict()
     for inst in instances:
-        cluster_hash = inst['labels']['cluster-hash']
-        hashes[cluster_hash] = 1
+        try:
+            cluster_hash = inst["labels"]["cluster-hash"]
+            hashes[cluster_hash] = 1
+        except KeyError:
+            logger.warning("Ignoring instance {}".format(inst["name"]))
+            continue
     return [uniq_hash for uniq_hash in hashes.keys()]
 
 
