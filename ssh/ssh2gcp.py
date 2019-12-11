@@ -301,6 +301,13 @@ def expand_project_template(project_id: str, match=r'^(\d{3})$',
     return project_id
 
 
+def alphanumeric_sort_list_of_dict_by_key(nodes: list, key: str) -> list:
+    convert = lambda text: int(text) if text.isdigit() else text
+    alphanum_key = lambda node: [convert(c) for c
+                                 in re.split('([0-9]+)', node[key])]
+    return sorted(nodes, key=alphanum_key)
+
+
 def process_user_request():
     global logger
 
@@ -336,7 +343,8 @@ def process_user_request():
     # Get the GCE instance to connect to
     instance = None
     try:
-        instance = cluster[node_type][node_id]
+        instances = alphanumeric_sort_list_of_dict_by_key(cluster[node_type], "name")
+        instance = instances[node_id]
     except KeyError:
         logger.error("Node type {} not found in cluster. Found values: {}".
                      format(node_type, [n for n in cluster]))

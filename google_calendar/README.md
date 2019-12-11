@@ -1,9 +1,7 @@
 ## Dependencies
 ```
 . venv/bin/activate
-pip3 install --upgrade google-api-python-client
-pip3 install --upgrade oauth2client
-pip3 install --upgrade pyyaml
+pip3 install --upgrade google-api-python-client oauth2client pyyaml
 ```
 
 ## Example commands
