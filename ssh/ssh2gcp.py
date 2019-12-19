@@ -256,7 +256,7 @@ def gcloud_configure_firewall(project_id: str, inst: dict, prefix: str = "ssh"):
 
     cmd = ["gcloud", "compute", "firewall-rules", "create",
            "--project", project_id, "--network", network,
-           name, "--allow=tcp:22"]
+           name, "--allow=tcp:22", "--source-ranges={}/32".format(address)]
 
     logger.info("Running command: {}".format(" ".join(cmd)))
     process = Popen(cmd, stdout=PIPE, stderr=PIPE)
