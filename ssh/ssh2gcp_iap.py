@@ -197,8 +197,10 @@ def cluster_hashes(instances: list) -> list:
         try:
             cluster_hash = inst["labels"]["cluster-hash"]
             hashes[cluster_hash] = 1
-        except KeyError:
-            logger.warning("Ignoring instance {}".format(inst["name"]))
+        except KeyError as ex:
+            # TODO: Remove the entry as it might result in redundant warnings
+            logger.warning("Ignoring instance {} as it's missing {}".format(
+                inst["name"], ex))
             continue
     return [uniq_hash for uniq_hash in hashes.keys()]
 
@@ -210,15 +212,21 @@ def get_cluster(project_id: str, cluster_label: str) -> dict:
         cluster[node_type] = list()
 
     for inst in instances:
-        if "ecfs-instance-type" in inst["labels"]:
-            cluster[inst["labels"]["ecfs-instance-type"]].append(inst)
-        elif "grafana" in inst["tags"]["items"]:
-            cluster["grafana"].append(inst)
-        elif "eloader" in inst["tags"]["items"]:
-            cluster["eloader"].append(inst)
-        else:
-            logger.warning("Failed to detect instance type for {}".format(
-                inst["name"]))
+        try:
+            if "ecfs-instance-type" in inst["labels"]:
+                cluster[inst["labels"]["ecfs-instance-type"]].append(inst)
+            elif "grafana" in inst["tags"]["items"]:
+                cluster["grafana"].append(inst)
+            elif "eloader" in inst["tags"]["items"]:
+                cluster["eloader"].append(inst)
+            else:
+                logger.warning("Failed to detect instance type for {}".format(
+                    inst["name"]))
+        except KeyError as ex:
+            logger.warning("Ignoring instance {} as it's missing {}".format(
+                inst["name"], ex))
+            continue
+
     logger.debug("Detected instances: {}".format(cluster))
     return cluster
 
