@@ -78,9 +78,9 @@ def parse_arguments():
                               default=0, nargs='?', action=StoreNodeTypeId,
                               metavar='GRAFANA_ID',
                               help="Grafana id")
-    parser.add_argument('-F', '--no-firewall', dest='firewall',
-                        action='store_false',
-                        help="Do not create firewall rules")
+    parser.add_argument('-f', '--firewall', dest='firewall',
+                        action='store_true',
+                        help="Create firewall rules to allow IAP connectivity")
     parser.add_argument('-u', '--user', dest='user_name', default='centos',
                         help="Remote user name")
     parser.add_argument('-c', '--cache', dest='cache_ttl', type=int,
@@ -260,8 +260,7 @@ def gcloud_configure_firewall(project_id: str, inst: dict):
     stdout, stderr = process.communicate()
     if process.returncode:
         if b"exists" in stderr:
-            logger.info("Firewall rule {} already exists. You can add -F "
-                        "to skip firewall rule creation.".format(rule_name))
+            logger.info("Firewall rule {} already exists".format(rule_name))
         else:
             logger.warning("Failed to create firewall rule. SSH might hang.")
             logger.warning("return code: {}. stderr: {}".format(
