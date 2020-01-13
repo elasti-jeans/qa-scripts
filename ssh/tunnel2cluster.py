@@ -298,7 +298,10 @@ def process_user_request():
             node_type, cluster_id, ex))
         exit(1)
 
-    create_tunnels(project_id, instance, tunnels)
+    try:
+        create_tunnels(project_id, instance, tunnels)
+    except KeyboardInterrupt:
+        logger.info("Received Ctrl+C - stopping the tunnel")
 
 
 if __name__ == '__main__':
