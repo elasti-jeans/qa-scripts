@@ -280,14 +280,20 @@ def process_user_request():
         node_type = "management"
         print()
         instance = cluster[node_type][0]
+        # HTTP
         tunnels.extend(["-L", "80:{0}:80".format(
             instance["networkInterfaces"][0]["networkIP"])])
+        # HTTPS
         tunnels.extend(["-L", "443:{0}:443".format(
             instance["networkInterfaces"][0]["networkIP"])])
 
         node_type = "grafana"
         instance = cluster[node_type][0]
+        # Grafana
         tunnels.extend(["-L", "3000:{0}:3000".format(
+            instance["networkInterfaces"][0]["networkIP"])])
+        # Prometheus
+        tunnels.extend(["-L", "9090:{0}:9090".format(
             instance["networkInterfaces"][0]["networkIP"])])
 
         node_type = "eloader"
