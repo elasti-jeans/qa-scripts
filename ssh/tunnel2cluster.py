@@ -62,6 +62,8 @@ def parse_arguments():
                         help="Cache TTL in seconds", default='1800')
     parser.add_argument('-q', '--quiet', dest='quiet', action='store_true',
                         help="Do not log to the console")
+    parser.add_argument('-o', '--port-offset', dest='offset', type=int,
+                        default=0, help="Local port offset")
     parser.add_argument(dest='cluster_id',
                         help="Cluster id, i.e. PROJECT_ID for single-cluster "
                              "projects or PROJECT_ID:LABEL for multi-cluster "
@@ -245,6 +247,10 @@ def alphanumeric_sort_list_of_dict_by_key(nodes: list, key: str) -> list:
     return sorted(nodes, key=alphanum_key)
 
 
+def get_tunnel_params(ip: str, port: int, local_offset: int = 0) -> str:
+    return "{}:{}:{}".format(port+local_offset, ip, port)
+
+
 def process_user_request():
     global logger
 
@@ -254,6 +260,7 @@ def process_user_request():
     cluster_id = args.cluster_id
     cache_ttl = args.cache_ttl
     quiet = args.quiet
+    offset = args.offset
 
     log_name = os.path.splitext(myname)[0] + '.log'
     console_log_level = logging.INFO
@@ -280,24 +287,25 @@ def process_user_request():
         node_type = "management"
         print()
         instance = cluster[node_type][0]
+
         # HTTP
-        tunnels.extend(["-L", "80:{0}:80".format(
-            instance["networkInterfaces"][0]["networkIP"])])
+        ip = instance["networkInterfaces"][0]["networkIP"]
+        tunnels.extend(["-L", get_tunnel_params(ip, 80, offset)])
+
         # HTTPS
-        tunnels.extend(["-L", "443:{0}:443".format(
-            instance["networkInterfaces"][0]["networkIP"])])
+        tunnels.extend(["-L", get_tunnel_params(ip, 443, offset)])
 
         node_type = "grafana"
         instance = cluster[node_type][0]
+        ip = instance["networkInterfaces"][0]["networkIP"]
         # Grafana
-        tunnels.extend(["-L", "3000:{0}:3000".format(
-            instance["networkInterfaces"][0]["networkIP"])])
+        tunnels.extend(["-L", get_tunnel_params(ip, 3000, offset)])
         # Prometheus
-        tunnels.extend(["-L", "9090:{0}:9090".format(
-            instance["networkInterfaces"][0]["networkIP"])])
+        tunnels.extend(["-L", get_tunnel_params(ip, 9090, offset)])
+
 
         node_type = "eloader"
-        instance = alphanumeric_sort_list_of_dict_by_key(
+        jump_host = alphanumeric_sort_list_of_dict_by_key(
             cluster[node_type], "name")[0]
     except KeyError as ex:
         logger.error("{} node not found in cluster {} - {}".format(
@@ -305,7 +313,7 @@ def process_user_request():
         exit(1)
 
     try:
-        create_tunnels(project_id, instance, tunnels)
+        create_tunnels(project_id, jump_host, tunnels)
     except KeyboardInterrupt:
         logger.info("Received Ctrl+C - stopping the tunnel")
 
