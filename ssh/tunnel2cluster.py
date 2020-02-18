@@ -14,7 +14,7 @@ mypath = None
 myname = None
 cache_dir = "/tmp/cloudctl.cache"
 node_types = ["management", "storage-node", "replication-agent",
-              "grafana", "eloader"]
+              "grafana", "auxiliary", "eloader"]
 logger = None
 
 
@@ -285,8 +285,13 @@ def process_user_request():
     node_type = None
     try:
         node_type = "management"
-        print()
         instance = cluster[node_type][0]
+
+        is_filestore = None
+        try:
+            is_filestore = instance["labels"]["filer-instance-id"]
+        except KeyError:
+            pass
 
         # HTTP
         ip = instance["networkInterfaces"][0]["networkIP"]
@@ -303,8 +308,11 @@ def process_user_request():
         # Prometheus
         tunnels.extend(["-L", get_tunnel_params(ip, 9090, offset)])
 
-
-        node_type = "eloader"
+        if is_filestore:
+            node_type = "auxiliary"
+        else:
+            node_type = "eloader"
+        logger.debug("Using {} as the jump host".format(node_type))
         jump_host = alphanumeric_sort_list_of_dict_by_key(
             cluster[node_type], "name")[0]
     except KeyError as ex:
