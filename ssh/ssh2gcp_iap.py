@@ -14,7 +14,7 @@ mypath = None
 myname = None
 cache_dir = "/tmp/ssh2gcp.cache"
 node_types = ["management", "storage-node", "replication-agent",
-              "grafana", "eloader"]
+              "grafana", "auxiliary", "eloader"]
 logger = None
 
 
@@ -78,6 +78,11 @@ def parse_arguments():
                               default=0, nargs='?', action=StoreNodeTypeId,
                               metavar='GRAFANA_ID',
                               help="Grafana id")
+    machine_type.add_argument('-a', '--auxiliary',
+                              dest='auxiliary', type=int,
+                              default=0, nargs='?', action=StoreNodeTypeId,
+                              metavar='AUXILIARY_ID',
+                              help="Auxiliary id")
     parser.add_argument('-f', '--firewall', dest='firewall',
                         action='store_true',
                         help="Create firewall rules to allow IAP connectivity")
