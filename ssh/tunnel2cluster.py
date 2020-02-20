@@ -300,13 +300,16 @@ def process_user_request():
         # HTTPS
         tunnels.extend(["-L", get_tunnel_params(ip, 443, offset)])
 
-        node_type = "grafana"
-        instance = cluster[node_type][0]
-        ip = instance["networkInterfaces"][0]["networkIP"]
-        # Grafana
-        tunnels.extend(["-L", get_tunnel_params(ip, 3000, offset)])
-        # Prometheus
-        tunnels.extend(["-L", get_tunnel_params(ip, 9090, offset)])
+        try:
+            node_type = "grafana"
+            instance = cluster[node_type][0]
+            ip = instance["networkInterfaces"][0]["networkIP"]
+            # Grafana
+            tunnels.extend(["-L", get_tunnel_params(ip, 3000, offset)])
+            # Prometheus
+            tunnels.extend(["-L", get_tunnel_params(ip, 9090, offset)])
+        except (KeyError, IndexError):
+            logger.warning("{} instance not found - its ports won't be tunneled".format(node_type))
 
         if is_filestore:
             node_type = "auxiliary"
