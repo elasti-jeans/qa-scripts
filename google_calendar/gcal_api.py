@@ -42,7 +42,6 @@ class GoogleCalendarAPI:
 
         return calendar
 
-
     def events_list(self, cal_id: str, start_utc: datetime.datetime, order_by='startTime'):
         page_token = None
         all_events = []
@@ -63,7 +62,6 @@ class GoogleCalendarAPI:
                 break
 
         return all_events
-
 
     def event_insert(self, cal_id: str, attendee: str, summary: str,
                      start_date: str, end_date: str):
@@ -95,4 +93,14 @@ class GoogleCalendarAPI:
                 calendarId=cal_id, body=event).execute()
             print('Event created: %s' % (event.get('htmlLink')))
         else:
-            print("WARN: Dry run - skipping calendar update")
+            print("WARN: Dry run - skipping calendar event insert")
+
+    def event_delete(self, cal_id: str, event_id: int):
+
+        if not self.dry_run:
+            self.service.events().delete(calendarId=cal_id, eventId=event_id).\
+                execute()
+            print('Event deleted: {}'.format(event_id))
+        else:
+            print("WARN: Dry run - skipping calendar event {} delete".format(
+                event_id))
